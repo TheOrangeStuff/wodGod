@@ -2,10 +2,10 @@
 
 import json
 from datetime import date
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
-from app.core.config import settings
 from app.core.database import get_db
+from app.core.auth import get_current_user_id
 from app.models.workout import WorkoutLogInput, ReadinessInput
 
 router = APIRouter(tags=["logs"])
@@ -16,14 +16,21 @@ router = APIRouter(tags=["logs"])
 # ============================================================
 
 @router.post("/workouts/{workout_id}/log")
-def log_workout(workout_id: str, log_input: WorkoutLogInput):
+def log_workout(
+    workout_id: str,
+    log_input: WorkoutLogInput,
+    user_id: str = Depends(get_current_user_id),
+):
     """Record a workout completion log."""
-    user_id = settings.DEFAULT_USER_ID
-
-    # Verify workout exists
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM workouts WHERE id = %s", (workout_id,))
+            # Verify workout exists and belongs to this user
+            cur.execute(
+                """SELECT w.id FROM workouts w
+                   JOIN programs p ON p.id = w.program_id
+                   WHERE w.id = %s AND p.user_id = %s""",
+                (workout_id, user_id),
+            )
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Workout not found")
 
@@ -61,20 +68,21 @@ def log_workout(workout_id: str, log_input: WorkoutLogInput):
 
 
 @router.get("/logs")
-def list_logs(limit: int = 20):
+def list_logs(limit: int = 20, user_id: str = Depends(get_current_user_id)):
     """List recent workout logs."""
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """SELECT wl.id, wl.workout_id, wl.actual_rpe, wl.missed_reps,
-                          wl.completed_at, wl.notes,
-                          w.focus, w.program_week, w.day_index
+                          wl.completed_at, wl.notes, wl.performance_json,
+                          w.focus, w.program_week, w.day_index,
+                          w.workout_json, w.scheduled_date
                    FROM workout_logs wl
                    JOIN workouts w ON w.id = wl.workout_id
                    WHERE wl.user_id = %s
                    ORDER BY wl.completed_at DESC
                    LIMIT %s""",
-                (settings.DEFAULT_USER_ID, limit),
+                (user_id, limit),
             )
             return [dict(r) for r in cur.fetchall()]
 
@@ -84,9 +92,11 @@ def list_logs(limit: int = 20):
 # ============================================================
 
 @router.post("/readiness")
-def submit_readiness(readiness: ReadinessInput):
+def submit_readiness(
+    readiness: ReadinessInput,
+    user_id: str = Depends(get_current_user_id),
+):
     """Submit daily readiness score. Upserts for today."""
-    user_id = settings.DEFAULT_USER_ID
     today = date.today()
 
     with get_db() as conn:
@@ -118,7 +128,7 @@ def submit_readiness(readiness: ReadinessInput):
 
 
 @router.get("/readiness")
-def get_readiness(days: int = 7):
+def get_readiness(days: int = 7, user_id: str = Depends(get_current_user_id)):
     """Get recent readiness scores."""
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -128,6 +138,6 @@ def get_readiness(days: int = 7):
                    WHERE user_id = %s
                    ORDER BY date DESC
                    LIMIT %s""",
-                (settings.DEFAULT_USER_ID, days),
+                (user_id, days),
             )
             return [dict(r) for r in cur.fetchall()]

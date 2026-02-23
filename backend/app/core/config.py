@@ -10,8 +10,10 @@ class Settings:
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
 
-    # Default user ID (single-user system)
-    DEFAULT_USER_ID: str = "11111111-1111-1111-1111-111111111111"
+    # JWT
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "change-me-in-production")
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_HOURS: int = int(os.getenv("JWT_EXPIRE_HOURS", "72"))
 
 
 settings = Settings()

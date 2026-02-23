@@ -3,16 +3,13 @@
 import json
 
 from app.core.database import get_db
-from app.core.config import settings
 
 
-def get_system_state(user_id: str | None = None) -> dict:
+def get_system_state(user_id: str) -> dict:
     """Call fn_build_system_state and return the assembled JSON."""
-    uid = user_id or settings.DEFAULT_USER_ID
-
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT fn_build_system_state(%s) AS state", (uid,))
+            cur.execute("SELECT fn_build_system_state(%s) AS state", (user_id,))
             row = cur.fetchone()
 
     state = row["state"]
