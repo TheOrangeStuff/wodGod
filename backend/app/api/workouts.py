@@ -246,7 +246,7 @@ def _store_workout(
                 """INSERT INTO workouts
                    (program_id, program_week, day_index, focus,
                     intensity_target_rpe, cns_load, workout_json, scheduled_date)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, COALESCE(%s, CURRENT_DATE))
                    RETURNING id""",
                 (
                     program_id,
@@ -256,7 +256,7 @@ def _store_workout(
                     prescription.intensity_target_rpe,
                     prescription.cns_load.value,
                     json.dumps(prescription.model_dump()),
-                    scheduled_date or "CURRENT_DATE",
+                    scheduled_date,
                 ),
             )
             return str(cur.fetchone()["id"])

@@ -13,9 +13,10 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/migrations:/docker-entrypoint-initdb.d/01-migrations
-      - ./db/functions:/docker-entrypoint-initdb.d/02-functions
-      - ./db/seeds:/docker-entrypoint-initdb.d/03-seeds
+      - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh
+      - ./db/migrations:/docker-entrypoint-initdb.d/sql/migrations
+      - ./db/functions:/docker-entrypoint-initdb.d/sql/functions
+      - ./db/seeds:/docker-entrypoint-initdb.d/sql/seeds
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wodgod"]
       interval: 5s
