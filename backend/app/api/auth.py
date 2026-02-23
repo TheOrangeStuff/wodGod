@@ -93,15 +93,21 @@ def setup_profile(
             if not row:
                 raise HTTPException(status_code=404, detail="User not found")
 
-            # Auto-create an accumulation program for new athletes
+            # Auto-create an accumulation program if none exists
             cur.execute(
-                """INSERT INTO programs (user_id, phase, week_number, is_active)
-                   VALUES (%s, 'accumulation', 1, true)
-                   ON CONFLICT DO NOTHING
-                   RETURNING id""",
+                "SELECT id FROM programs WHERE user_id = %s AND is_active = true",
                 (user_id,),
             )
-            program = cur.fetchone()
+            existing_program = cur.fetchone()
+            program = None
+            if not existing_program:
+                cur.execute(
+                    """INSERT INTO programs (user_id, phase, week_number, is_active)
+                       VALUES (%s, 'accumulation', 1, true)
+                       RETURNING id""",
+                    (user_id,),
+                )
+                program = cur.fetchone()
 
     return {
         "profile_complete": True,
