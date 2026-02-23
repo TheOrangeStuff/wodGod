@@ -190,6 +190,7 @@ BEGIN
         'user_profile', jsonb_build_object(
             'user_id', v_user.id,
             'age', v_user.age,
+            'sex', v_user.sex,
             'weight_kg', v_user.weight_kg,
             'height_cm', v_user.height_cm,
             'training_age_yr', v_user.training_age_yr,

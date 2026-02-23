@@ -1,15 +1,15 @@
 """Program management endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
-from app.core.config import settings
 from app.core.database import get_db
+from app.core.auth import get_current_user_id
 
 router = APIRouter(prefix="/programs", tags=["programs"])
 
 
 @router.get("/active")
-def get_active_program():
+def get_active_program(user_id: str = Depends(get_current_user_id)):
     """Get the current active program."""
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -19,7 +19,7 @@ def get_active_program():
                    FROM programs
                    WHERE user_id = %s AND is_active = true
                    ORDER BY created_at DESC LIMIT 1""",
-                (settings.DEFAULT_USER_ID,),
+                (user_id,),
             )
             row = cur.fetchone()
             if not row:
@@ -30,7 +30,7 @@ def get_active_program():
 
 
 @router.post("/advance-week")
-def advance_week():
+def advance_week(user_id: str = Depends(get_current_user_id)):
     """Advance the active program to the next week."""
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -39,7 +39,7 @@ def advance_week():
                    SET week_number = week_number + 1
                    WHERE user_id = %s AND is_active = true
                    RETURNING id, week_number, phase""",
-                (settings.DEFAULT_USER_ID,),
+                (user_id,),
             )
             row = cur.fetchone()
             if not row:
@@ -54,7 +54,7 @@ def advance_week():
 
 
 @router.post("/set-phase")
-def set_phase(phase: str):
+def set_phase(phase: str, user_id: str = Depends(get_current_user_id)):
     """Manually set the program phase."""
     valid_phases = {"accumulation", "intensification", "realization", "deload"}
     if phase not in valid_phases:
@@ -70,7 +70,7 @@ def set_phase(phase: str):
                    SET phase = %s::program_phase
                    WHERE user_id = %s AND is_active = true
                    RETURNING id, week_number, phase""",
-                (phase, settings.DEFAULT_USER_ID),
+                (phase, user_id),
             )
             row = cur.fetchone()
             if not row:
@@ -86,7 +86,7 @@ def set_phase(phase: str):
 
 @router.get("/movements")
 def list_movements(category: str | None = None):
-    """List all movements in the taxonomy."""
+    """List all movements in the taxonomy (public)."""
     with get_db() as conn:
         with conn.cursor() as cur:
             if category:
@@ -106,7 +106,7 @@ def list_movements(category: str | None = None):
 
 
 @router.get("/strength")
-def get_strength_metrics():
+def get_strength_metrics(user_id: str = Depends(get_current_user_id)):
     """Get current strength metrics."""
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -117,6 +117,6 @@ def get_strength_metrics():
                    JOIN movements m ON m.id = sm.movement_id
                    WHERE sm.user_id = %s
                    ORDER BY m.category, m.name""",
-                (settings.DEFAULT_USER_ID,),
+                (user_id,),
             )
             return [dict(r) for r in cur.fetchall()]

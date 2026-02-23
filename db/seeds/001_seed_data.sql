@@ -4,15 +4,20 @@
 -- ============================================================
 -- SEED USER
 -- ============================================================
-INSERT INTO users (id, name, age, weight_kg, height_cm, training_age_yr, equipment)
+-- password is 'demo' hashed with pgcrypto crypt/bf
+INSERT INTO users (id, username, password_hash, name, age, weight_kg, height_cm, sex, training_age_yr, equipment, profile_complete)
 VALUES (
     '11111111-1111-1111-1111-111111111111',
-    'Athlete',
+    'demo',
+    crypt('demo', gen_salt('bf')),
+    'Demo Athlete',
     32,
     88.5,
     178.0,
+    'male',
     4.0,
-    '["barbell", "dumbbells", "pull_up_bar", "rower", "assault_bike", "jump_rope", "kettlebell", "rings", "box", "wall_ball", "ab_mat"]'::jsonb
+    '["barbell", "dumbbells", "pull_up_bar", "rower", "assault_bike", "jump_rope", "kettlebell", "rings", "box", "wall_ball", "ab_mat"]'::jsonb,
+    true
 );
 
 -- ============================================================
