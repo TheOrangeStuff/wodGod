@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    container_name: wodgod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wodgod
+      POSTGRES_USER: wodgod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wodgod_dev}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d/01-migrations
+      - ./db/functions:/docker-entrypoint-initdb.d/02-functions
+      - ./db/seeds:/docker-entrypoint-initdb.d/03-seeds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wodgod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wodgod-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://wodgod:${POSTGRES_PASSWORD:-wodgod_dev}@db:5432/wodgod
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      LLM_MODEL: ${LLM_MODEL:-llama3}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
