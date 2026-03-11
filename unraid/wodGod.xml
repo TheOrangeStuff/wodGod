@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>wodGod</Name>
+  <Repository>ghcr.io/theorangestuff/wodgod:latest</Repository>
+  <Registry>https://github.com/TheOrangeStuff/wodGod/pkgs/container/wodgod</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/TheOrangeStuff/wodGod/issues</Support>
+  <Project>https://github.com/TheOrangeStuff/wodGod</Project>
+  <Overview>
+    wodGod is a stateful CrossFit programming engine for up to 10 athletes.
+    It generates personalized workouts via an LLM (Ollama or OpenAI-compatible),
+    stores training history in PostgreSQL, and enforces programming rules and
+    safety constraints. Dark-mode, mobile-first web GUI included.
+
+    REQUIRES: A running PostgreSQL 15 instance (e.g. the official postgres container on Unraid).
+    Point DATABASE_URL at your Postgres and run the migrations (see project README).
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8000]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/TheOrangeStuff/wodGod/main/unraid/wodGod.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/TheOrangeStuff/wodGod/main/unraid/wodGod-icon.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <Description>
+    wodGod — Stateful CrossFit programming engine. Generates personalized workouts via LLM, tracks training history, enforces safety constraints. Requires an external PostgreSQL 15 database.
+  </Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>8000</HostPort>
+        <ContainerPort>8000</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Environment>
+    <Variable>
+      <Value>postgresql://wodgod:wodgod_dev@192.168.1.X:5432/wodgod</Value>
+      <Name>DATABASE_URL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>change-me-in-production</Value>
+      <Name>JWT_SECRET</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>72</Value>
+      <Name>JWT_EXPIRE_HOURS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>ollama</Value>
+      <Name>LLM_PROVIDER</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>http://192.168.1.X:11434</Value>
+      <Name>LLM_BASE_URL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>llama3</Value>
+      <Name>LLM_MODEL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>LLM_API_KEY</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Data/>
+  <Config Name="WebUI Port" Target="8000" Default="8000" Mode="tcp" Description="Port for the wodGod web interface and API." Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="Database URL" Target="DATABASE_URL" Default="postgresql://wodgod:wodgod_dev@192.168.1.X:5432/wodgod" Description="PostgreSQL connection string. Point this at your existing Postgres container/instance. Example: postgresql://user:pass@IP:5432/wodgod" Type="Variable" Display="always" Required="true" Mask="false">postgresql://wodgod:wodgod_dev@192.168.1.X:5432/wodgod</Config>
+  <Config Name="JWT Secret" Target="JWT_SECRET" Default="change-me-in-production" Description="Secret key for signing JWT auth tokens. CHANGE THIS to a random string for security." Type="Variable" Display="always" Required="true" Mask="true">change-me-in-production</Config>
+  <Config Name="JWT Expiry (hours)" Target="JWT_EXPIRE_HOURS" Default="72" Description="How long JWT tokens remain valid, in hours." Type="Variable" Display="advanced" Required="false" Mask="false">72</Config>
+  <Config Name="LLM Provider" Target="LLM_PROVIDER" Default="ollama" Description="LLM backend to use. Set to 'ollama' for a local Ollama server, or 'openai_compatible' for vLLM / text-generation-inference / OpenAI-compatible APIs." Type="Variable" Display="always" Required="true" Mask="false">ollama</Config>
+  <Config Name="LLM Base URL" Target="LLM_BASE_URL" Default="http://192.168.1.X:11434" Description="URL of your LLM server. For Ollama use http://YOUR_IP:11434. For OpenAI-compatible use http://YOUR_IP:8080 (or wherever your server runs)." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.X:11434</Config>
+  <Config Name="LLM Model" Target="LLM_MODEL" Default="llama3" Description="Model name to use for workout generation. For Ollama: e.g. 'llama3'. For OpenAI-compatible: e.g. 'meta-llama/Meta-Llama-3-8B-Instruct'." Type="Variable" Display="always" Required="true" Mask="false">llama3</Config>
+  <Config Name="LLM API Key" Target="LLM_API_KEY" Default="" Description="API key for OpenAI-compatible providers. Leave blank for Ollama or if your provider doesn't require a key." Type="Variable" Display="always" Required="false" Mask="true"/>
+</Container>
