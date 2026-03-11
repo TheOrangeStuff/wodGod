@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>wodGod</Name>
+  <Repository>ghcr.io/theorangestuff/wodgod:latest</Repository>
+  <Registry>https://ghcr.io/theorangestuff/wodgod</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/TheOrangeStuff/wodGod/issues</Support>
+  <Project>https://github.com/TheOrangeStuff/wodGod</Project>
+  <Overview>wodGod is a stateful CrossFit programming engine for up to 10 athletes. It generates personalized workouts via an LLM, stores training history in PostgreSQL, and enforces programming rules and safety constraints.</Overview>
+  <Category>Productivity:</Category>
+  <WebUI>http://[IP]:[PORT:8000]</WebUI>
+  <Icon>https://raw.githubusercontent.com/TheOrangeStuff/wodGod/main/backend/static/icon-512.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <Description>wodGod - AI-powered CrossFit programming engine. Generates personalized workouts using LLM, tracks training history, and enforces programming rules. Requires an external PostgreSQL database and an Ollama (or OpenAI-compatible) LLM server.</Description>
+
+  <!-- Ports -->
+  <Config Name="Web UI Port" Target="8000" Default="8000" Mode="tcp" Description="Port for the wodGod web interface" Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+
+  <!-- Variables -->
+  <Config Name="Database URL" Target="DATABASE_URL" Default="postgresql://wodgod:wodgod_dev@192.168.1.x:5432/wodgod" Mode="" Description="PostgreSQL connection string. Point this at your existing Postgres instance." Type="Variable" Display="always" Required="true" Mask="false">postgresql://wodgod:wodgod_dev@192.168.1.x:5432/wodgod</Config>
+
+  <Config Name="JWT Secret" Target="JWT_SECRET" Default="change-me-in-production" Mode="" Description="Secret key for JWT token signing. Change this to a random string!" Type="Variable" Display="always" Required="true" Mask="true">change-me-in-production</Config>
+
+  <Config Name="JWT Expiry (hours)" Target="JWT_EXPIRE_HOURS" Default="72" Mode="" Description="How many hours before login tokens expire." Type="Variable" Display="always" Required="false" Mask="false">72</Config>
+
+  <Config Name="LLM Provider" Target="LLM_PROVIDER" Default="ollama" Mode="" Description="LLM backend to use: 'ollama' or 'openai_compatible'" Type="Variable" Display="always" Required="true" Mask="false">ollama</Config>
+
+  <Config Name="LLM Base URL" Target="LLM_BASE_URL" Default="http://192.168.1.x:11434" Mode="" Description="URL of your Ollama or OpenAI-compatible LLM server." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.x:11434</Config>
+
+  <Config Name="LLM Model" Target="LLM_MODEL" Default="llama3" Mode="" Description="Model name to use for workout generation (e.g. llama3, mistral, etc.)" Type="Variable" Display="always" Required="true" Mask="false">llama3</Config>
+
+  <Config Name="LLM API Key" Target="LLM_API_KEY" Default="" Mode="" Description="API key for OpenAI-compatible providers. Leave blank for Ollama." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>
