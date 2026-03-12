@@ -17,7 +17,7 @@ wodGod is a stateful CrossFit programming engine for up to 10 athletes. It gener
 
 ## Quick Start
 
-The Postgres database is provided externally (not managed by docker compose). Ensure it is running and reachable before starting the backend.
+The Postgres database is provided externally (not managed by docker compose). Ensure it is running and reachable before starting the backend. Database migrations are applied automatically on backend startup — no manual `psql` steps needed.
 
 ```bash
 cp .env.example .env
@@ -28,7 +28,7 @@ docker compose up -d backend
 # Demo account: demo / demo
 ```
 
-To initialize the database schema on a fresh Postgres instance, run the SQL files in order:
+To manually re-run migrations (if needed):
 ```bash
 psql $DATABASE_URL -f db/migrations/001_schema.sql
 psql $DATABASE_URL -f db/migrations/002_auth_multiuser.sql
@@ -131,11 +131,11 @@ See `.env.example` for all configuration. Key variables:
 - [x] `.env` configured with DATABASE_URL pointing to external Postgres instance
 - [x] PostgreSQL connection verified (Python `psycopg2` connect test returned "connected!")
 - [x] Backend started via `docker compose up -d backend` (both `db` and `backend` services running)
-- [~] Database migrations — 001_schema.sql ran (tables exist), but 002_auth_multiuser.sql NOT yet applied (missing `username` column caused 500 on /auth/register). Need to run: `docker exec -i wodgod-db psql -U wodgod -d wodgod < db/migrations/002_auth_multiuser.sql` then 001_system_state.sql and 001_seed_data.sql
+- [x] Auto-migration added — backend now applies all SQL migrations on startup via `schema_migrations` tracking table. Rebuild backend to pick up: `docker compose up -d --build backend`
 - [ ] LLM provider configured and reachable
 
 ### User Testing
-- [ ] Login to the app (demo/demo or new account) — blocked: need 002_auth_multiuser migration first
+- [ ] Login to the app (demo/demo or new account) — rebuild backend first to trigger auto-migration
 - [ ] Set up athlete profile
 - [ ] Generate a workout
 - [ ] Log a completed workout
