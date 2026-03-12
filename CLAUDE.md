@@ -130,12 +130,12 @@ See `.env.example` for all configuration. Key variables:
 ### Infrastructure Setup
 - [x] `.env` configured with DATABASE_URL pointing to external Postgres instance
 - [x] PostgreSQL connection verified (Python `psycopg2` connect test returned "connected!")
-- [ ] Database migrations run (001_schema, 002_auth_multiuser, 001_system_state, 001_seed_data)
-- [ ] Backend started via `docker compose up -d backend`
+- [x] Backend started via `docker compose up -d backend` (both `db` and `backend` services running)
+- [~] Database migrations — 001_schema.sql ran (tables exist), but 002_auth_multiuser.sql NOT yet applied (missing `username` column caused 500 on /auth/register). Need to run: `docker exec -i wodgod-db psql -U wodgod -d wodgod < db/migrations/002_auth_multiuser.sql` then 001_system_state.sql and 001_seed_data.sql
 - [ ] LLM provider configured and reachable
 
 ### User Testing
-- [ ] Login to the app (demo/demo or new account)
+- [ ] Login to the app (demo/demo or new account) — blocked: need 002_auth_multiuser migration first
 - [ ] Set up athlete profile
 - [ ] Generate a workout
 - [ ] Log a completed workout
