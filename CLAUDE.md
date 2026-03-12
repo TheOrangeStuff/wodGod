@@ -124,3 +124,21 @@ See `.env.example` for all configuration. Key variables:
 - `LLM_BASE_URL` — LLM server endpoint
 - `LLM_MODEL` — Model name (e.g., `llama3`)
 - `DATABASE_URL` — Full connection string pointing to the externally-provided Postgres instance
+
+## Development Status (as of 2026-03-12)
+
+### Infrastructure Setup
+- [x] `.env` configured with DATABASE_URL pointing to external Postgres instance
+- [x] PostgreSQL connection verified (Python `psycopg2` connect test returned "connected!")
+- [ ] Database migrations run (001_schema, 002_auth_multiuser, 001_system_state, 001_seed_data)
+- [ ] Backend started via `docker compose up -d backend`
+- [ ] LLM provider configured and reachable
+
+### User Testing
+- [ ] Login to the app (demo/demo or new account)
+- [ ] Set up athlete profile
+- [ ] Generate a workout
+- [ ] Log a completed workout
+- [ ] Test calendar/history views
+- [ ] Test readiness check-in flow
+- [ ] End-to-end: generate a full week of programming
