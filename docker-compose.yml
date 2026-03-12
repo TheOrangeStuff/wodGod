@@ -25,12 +25,10 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: wodgod-backend
     restart: unless-stopped
-    volumes:
-      - ./db:/app/db:ro
     environment:
       DATABASE_URL: postgresql://wodgod:${POSTGRES_PASSWORD:-wodgod_dev}@db:5432/wodgod
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
