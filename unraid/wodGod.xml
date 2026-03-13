@@ -19,7 +19,7 @@
     safety constraints. Dark-mode, mobile-first web GUI included.
 
     REQUIRES: A running PostgreSQL 15 instance (e.g. the official postgres container on Unraid).
-    Point DATABASE_URL at your Postgres and run the migrations (see project README).
+    The app will automatically create the database and schema on first startup.
   </Overview>
   <Category>Productivity: Tools:</Category>
   <WebUI>http://[IP]:[PORT:8000]</WebUI>
@@ -27,7 +27,7 @@
   <Icon>https://raw.githubusercontent.com/TheOrangeStuff/wodGod/main/unraid/wodGod-icon.png</Icon>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
   <Description>
-    wodGod — Stateful CrossFit programming engine. Generates personalized workouts via LLM, tracks training history, enforces safety constraints. Requires an external PostgreSQL 15 database.
+    wodGod — Stateful CrossFit programming engine. Generates personalized workouts via LLM, tracks training history, enforces safety constraints. Requires an external PostgreSQL 15 instance — the app auto-creates the database and schema on startup.
   </Description>
   <Networking>
     <Mode>bridge</Mode>
@@ -41,8 +41,28 @@
   </Networking>
   <Environment>
     <Variable>
-      <Value>postgresql://wodgod:wodgod_dev@192.168.1.X:5432/wodgod</Value>
-      <Name>DATABASE_URL</Name>
+      <Value>192.168.1.X</Value>
+      <Name>POSTGRES_HOST</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>5432</Value>
+      <Name>POSTGRES_PORT</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>wodgod</Value>
+      <Name>POSTGRES_DB</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>wodgod</Value>
+      <Name>POSTGRES_USER</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>wodgod_dev</Value>
+      <Name>POSTGRES_PASSWORD</Name>
       <Mode/>
     </Variable>
     <Variable>
@@ -78,7 +98,11 @@
   </Environment>
   <Data/>
   <Config Name="WebUI Port" Target="8000" Default="8000" Mode="tcp" Description="Port for the wodGod web interface and API." Type="Port" Display="always" Required="true" Mask="false">8000</Config>
-  <Config Name="Database URL" Target="DATABASE_URL" Default="postgresql://wodgod:wodgod_dev@192.168.1.X:5432/wodgod" Description="PostgreSQL connection string. Point this at your existing Postgres container/instance. Example: postgresql://user:pass@IP:5432/wodgod" Type="Variable" Display="always" Required="true" Mask="false">postgresql://wodgod:wodgod_dev@192.168.1.X:5432/wodgod</Config>
+  <Config Name="Postgres Host" Target="POSTGRES_HOST" Default="192.168.1.X" Description="IP address or hostname of your PostgreSQL server." Type="Variable" Display="always" Required="true" Mask="false">192.168.1.X</Config>
+  <Config Name="Postgres Port" Target="POSTGRES_PORT" Default="5432" Description="Port your PostgreSQL server is listening on." Type="Variable" Display="always" Required="true" Mask="false">5432</Config>
+  <Config Name="Postgres Database" Target="POSTGRES_DB" Default="wodgod" Description="Database name. Will be created automatically if it doesn't exist." Type="Variable" Display="always" Required="true" Mask="false">wodgod</Config>
+  <Config Name="Postgres User" Target="POSTGRES_USER" Default="wodgod" Description="PostgreSQL username. Must have permission to create databases (or the target DB must already exist)." Type="Variable" Display="always" Required="true" Mask="false">wodgod</Config>
+  <Config Name="Postgres Password" Target="POSTGRES_PASSWORD" Default="wodgod_dev" Description="Password for the PostgreSQL user." Type="Variable" Display="always" Required="true" Mask="true">wodgod_dev</Config>
   <Config Name="JWT Secret" Target="JWT_SECRET" Default="change-me-in-production" Description="Secret key for signing JWT auth tokens. CHANGE THIS to a random string for security." Type="Variable" Display="always" Required="true" Mask="true">change-me-in-production</Config>
   <Config Name="JWT Expiry (hours)" Target="JWT_EXPIRE_HOURS" Default="72" Description="How long JWT tokens remain valid, in hours." Type="Variable" Display="advanced" Required="false" Mask="false">72</Config>
   <Config Name="LLM Provider" Target="LLM_PROVIDER" Default="ollama" Description="LLM backend to use. Set to 'ollama' for a local Ollama server, or 'openai_compatible' for vLLM / text-generation-inference / OpenAI-compatible APIs." Type="Variable" Display="always" Required="true" Mask="false">ollama</Config>
