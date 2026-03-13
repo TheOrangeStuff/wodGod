@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api import auth, workouts, logs, programs
+from app.core.bootstrap import bootstrap_database
 from app.core.migrate import run_migrations
 
 logger = logging.getLogger("wodgod")
@@ -17,7 +18,9 @@ logger = logging.getLogger("wodgod")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run database migrations on startup."""
+    """Bootstrap database and run migrations on startup."""
+    logger.info("Bootstrapping database...")
+    bootstrap_database()
     logger.info("Running database migrations...")
     run_migrations()
     logger.info("Migrations complete.")
