@@ -519,14 +519,8 @@ function renderHistoryPage() {
     return html;
 }
 
-function showHistoryDetail(log) {
-    const wj = typeof log.workout_json === 'string' ? JSON.parse(log.workout_json) : (log.workout_json || {});
-    const completedDate = new Date(log.completed_at);
-    const dateStr = completedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = completedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-
+function renderWorkoutDetails(wj) {
     let details = '';
-
     if (wj.primary_strength) {
         details += renderStrengthSection('Primary Strength', wj.primary_strength);
     }
@@ -559,6 +553,15 @@ function showHistoryDetail(log) {
             <div class="mobility-text">${wj.mobility_prompt}</div>
         </div>`;
     }
+    return details;
+}
+
+function showHistoryDetail(log, logIndex) {
+    const wj = typeof log.workout_json === 'string' ? JSON.parse(log.workout_json) : (log.workout_json || {});
+    const completedDate = new Date(log.completed_at);
+    const dateStr = completedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = completedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const details = renderWorkoutDetails(wj);
 
     const overlay = document.createElement('div');
     overlay.className = 'readiness-overlay';
@@ -575,7 +578,10 @@ function showHistoryDetail(log) {
         </div>
         ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
         ${log.notes ? `<div class="history-detail-notes">${log.notes}</div>` : ''}
-        <button class="btn btn-secondary" id="history-detail-close">Close</button>
+        <div class="history-detail-actions">
+            <button class="btn btn-primary" id="history-edit-btn">Edit</button>
+            <button class="btn btn-secondary" id="history-detail-close">Close</button>
+        </div>
     </div>`;
 
     document.body.appendChild(overlay);
@@ -584,6 +590,81 @@ function showHistoryDetail(log) {
     const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
     document.getElementById('history-detail-close').addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    document.getElementById('history-edit-btn').addEventListener('click', () => {
+        overlay.remove();
+        showHistoryEditModal(log, logIndex);
+    });
+}
+
+function showHistoryEditModal(log, logIndex) {
+    let editRpe = log.actual_rpe;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">Edit Log</div>
+        <div id="edit-log-error" class="error-msg" style="display:none"></div>
+        <div class="form-group">
+            <label class="form-label">RPE</label>
+            <div class="rpe-scale" id="edit-rpe-scale">
+                ${[1,2,3,4,5,6,7,8,9,10].map(n =>
+                    `<button class="rpe-btn ${n === editRpe ? 'selected' : ''}" data-rpe="${n}">${n}</button>`
+                ).join('')}
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Missed Reps</label>
+            <input class="form-input" id="edit-missed" type="number" min="0" value="${log.missed_reps || 0}">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Notes (optional)</label>
+            <input class="form-input" id="edit-notes" type="text" value="${(log.notes || '').replace(/"/g, '&quot;')}" placeholder="How did it go?">
+        </div>
+        <button class="btn btn-primary" id="edit-log-save">Save Changes</button>
+        <button class="btn btn-secondary" id="edit-log-cancel" style="margin-top:8px">Cancel</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    overlay.querySelectorAll('.rpe-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            editRpe = parseInt(btn.dataset.rpe);
+            overlay.querySelectorAll('.rpe-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        });
+    });
+
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+    document.getElementById('edit-log-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    document.getElementById('edit-log-save').addEventListener('click', async () => {
+        const errEl = document.getElementById('edit-log-error');
+        try {
+            await api(`/logs/${log.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    actual_rpe: editRpe,
+                    missed_reps: parseInt(document.getElementById('edit-missed').value) || 0,
+                    notes: document.getElementById('edit-notes').value || null,
+                    performance_json: {},
+                }),
+            });
+            // Update local data so the list reflects changes without refetching
+            if (historyData && historyData[logIndex]) {
+                historyData[logIndex].actual_rpe = editRpe;
+                historyData[logIndex].missed_reps = parseInt(document.getElementById('edit-missed').value) || 0;
+                historyData[logIndex].notes = document.getElementById('edit-notes').value || null;
+            }
+            close();
+            loadHistory();
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.style.display = '';
+        }
+    });
 }
 
 async function loadHistory() {
@@ -598,7 +679,7 @@ async function loadHistory() {
         document.querySelectorAll('.history-item[data-history-idx]').forEach(el => {
             el.addEventListener('click', () => {
                 const idx = parseInt(el.dataset.historyIdx);
-                if (historyData[idx]) showHistoryDetail(historyData[idx]);
+                if (historyData[idx]) showHistoryDetail(historyData[idx], idx);
             });
         });
     } catch {
