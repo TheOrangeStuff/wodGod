@@ -152,8 +152,8 @@ See `.env.example` for all configuration. Key variables:
 - [x] Auth flow (login/register)
 - [x] First-time profile setup
 - [x] WOD view (today's workout display + log modal)
-- [x] Calendar view (weekly overview + generate week)
-- [x] History view (completed workout logs)
+- [x] Calendar view (weekly overview + generate week + tap-to-expand workout details)
+- [x] History view (completed workout logs + tap-to-expand detail modal)
 - [x] Profile page (Edit Profile, Settings — placeholders; Log Out with confirmation modal)
 - [x] Centered header with wodGod branding
 - [x] 4-tab bottom navigation (WOD, Calendar, History, Profile)
