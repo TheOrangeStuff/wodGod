@@ -33,6 +33,7 @@ To initialize the database schema on a fresh Postgres instance, run the SQL file
 psql $DATABASE_URL -f db/migrations/001_schema.sql
 psql $DATABASE_URL -f db/migrations/002_auth_multiuser.sql
 psql $DATABASE_URL -f db/functions/001_system_state.sql
+psql $DATABASE_URL -f db/functions/002_enhanced_state.sql
 psql $DATABASE_URL -f db/seeds/001_seed_data.sql
 ```
 
@@ -69,7 +70,7 @@ backend/
 db/
   init.sh                # DB init orchestrator (runs on container start)
   migrations/            # Schema DDL (001–003)
-  functions/             # SQL functions (fn_build_system_state)
+  functions/             # SQL functions (fn_build_system_state, enhanced context helpers)
   seeds/                 # Demo user & movement taxonomy
 unraid/
   wodgod.xml             # Unraid Docker template for App Store installation
@@ -118,7 +119,8 @@ psql $DATABASE_URL -f db/migrations/001_schema.sql
 
 - Postgres is provided externally by the user — not managed by docker compose
 - Migrations can be run manually via `psql` (see Quick Start) or automatically via `db/init.sh` if using the docker-compose `db` service
-- `fn_build_system_state(user_id)` returns comprehensive JSONB (profile, fatigue, movement balance, aerobic status, progress, rules)
+- `fn_build_system_state(user_id)` returns comprehensive JSONB (profile, fatigue, movement balance, aerobic status, progress, rules, recent prescriptions, per-movement load history)
+- Enhanced LLM context (via `002_enhanced_state.sql`): `recent_prescriptions` (14-day workout history), `movement_load_history` (per-movement load/RPE for last 4 sessions), `movement_balance_last_21_days` (mesocycle balance), extended 21-day fatigue metrics
 - Max 10 users enforced by database trigger
 - Key tables: `users`, `movements`, `strength_metrics`, `programs`, `workouts`, `workout_logs`, `daily_readiness`
 
@@ -143,6 +145,7 @@ See `.env.example` for all configuration. Key variables:
 - [x] Unraid template (`unraid/wodgod.xml`) with container logo
 - [x] bcrypt/passlib compatibility fixed (bcrypt pinned to 4.0.1)
 - [x] Static asset caching fixed — no-cache middleware + cache-busted query params in index.html
+- [x] Enhanced LLM context — recent prescriptions, per-movement load history, 21-day fatigue/balance windows fed to LLM for smarter programming
 - [ ] LLM provider configured and reachable
 
 ### Frontend

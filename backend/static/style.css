@@ -364,6 +364,12 @@ body {
 
 .cal-status {
     font-size: 16px;
+    color: var(--text-dim);
+    transition: color 0.2s;
+}
+
+.cal-day:hover .cal-status {
+    color: var(--accent);
 }
 
 .cal-day.today {
@@ -518,6 +524,8 @@ body {
     padding: 24px;
     width: 100%;
     max-width: 400px;
+    max-height: 85dvh;
+    overflow-y: auto;
 }
 
 .readiness-title {
