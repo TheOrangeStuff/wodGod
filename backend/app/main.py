@@ -20,11 +20,15 @@ logger = logging.getLogger("wodgod")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Bootstrap database and run migrations on startup."""
-    logger.info("Bootstrapping database...")
-    bootstrap_database()
-    logger.info("Running database migrations...")
-    run_migrations()
-    logger.info("Migrations complete.")
+    try:
+        logger.info("Bootstrapping database...")
+        bootstrap_database()
+        logger.info("Running database migrations...")
+        run_migrations()
+        logger.info("Migrations complete — startup OK.")
+    except Exception:
+        logger.exception("FATAL: Database bootstrap/migration failed. The app will not serve requests correctly.")
+        raise
     yield
 
 
