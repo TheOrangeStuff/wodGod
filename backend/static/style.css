@@ -670,6 +670,44 @@ body {
     font-weight: 700;
 }
 
+/* Unit toggle */
+.unit-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.unit-toggle-btn {
+    flex: 1;
+    padding: 10px 0;
+    background: var(--surface2);
+    border: none;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.unit-toggle-btn.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.unit-toggle-btn:first-child {
+    border-right: 1px solid var(--border);
+}
+
+/* Success message */
+.success-msg {
+    color: var(--green);
+    font-size: 13px;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
 .page-title {
     font-size: 18px;
     font-weight: 700;

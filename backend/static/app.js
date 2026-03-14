@@ -130,12 +130,24 @@ async function loadUser() {
 // ============================================================
 // First-Time Setup
 // ============================================================
+let setupUnits = 'metric';
+
 function renderSetup() {
+    const isMetric = setupUnits === 'metric';
+    const weightLabel = isMetric ? 'Weight (kg)' : 'Weight (lbs)';
+    const heightLabel = isMetric ? 'Height (cm)' : 'Height (in)';
     return `
     <div class="auth-container">
         <div class="auth-logo">wod<span>God</span></div>
         <div class="auth-subtitle">Complete Your Profile</div>
         <div id="setup-error" class="error-msg" style="display:none"></div>
+        <div class="form-group">
+            <label class="form-label">Units</label>
+            <div class="unit-toggle" id="setup-unit-toggle">
+                <button class="unit-toggle-btn ${isMetric ? 'active' : ''}" data-unit="metric">Metric</button>
+                <button class="unit-toggle-btn ${!isMetric ? 'active' : ''}" data-unit="imperial">Imperial</button>
+            </div>
+        </div>
         <div class="form-group">
             <label class="form-label">Name</label>
             <input class="form-input" id="setup-name" type="text">
@@ -145,12 +157,12 @@ function renderSetup() {
             <input class="form-input" id="setup-age" type="number" min="10" max="100">
         </div>
         <div class="form-group">
-            <label class="form-label">Weight (kg)</label>
-            <input class="form-input" id="setup-weight" type="number" step="0.1" min="30">
+            <label class="form-label">${weightLabel}</label>
+            <input class="form-input" id="setup-weight" type="number" step="0.1" min="1">
         </div>
         <div class="form-group">
-            <label class="form-label">Height (cm)</label>
-            <input class="form-input" id="setup-height" type="number" step="0.1" min="100">
+            <label class="form-label">${heightLabel}</label>
+            <input class="form-input" id="setup-height" type="number" step="0.1" min="1">
         </div>
         <div class="form-group">
             <label class="form-label">Sex</label>
@@ -168,16 +180,52 @@ function renderSetup() {
 }
 
 function bindSetup() {
+    // Unit toggle
+    document.querySelectorAll('#setup-unit-toggle .unit-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setupUnits = btn.dataset.unit;
+            // Preserve entered values across re-render
+            const savedName = document.getElementById('setup-name')?.value || '';
+            const savedAge = document.getElementById('setup-age')?.value || '';
+            const savedWeight = document.getElementById('setup-weight')?.value || '';
+            const savedHeight = document.getElementById('setup-height')?.value || '';
+            const savedSex = document.getElementById('setup-sex')?.value || 'male';
+            const savedTraining = document.getElementById('setup-training-age')?.value || '0';
+
+            const app = document.getElementById('app');
+            app.innerHTML = renderSetup();
+            bindSetup();
+
+            // Restore values
+            document.getElementById('setup-name').value = savedName;
+            document.getElementById('setup-age').value = savedAge;
+            document.getElementById('setup-weight').value = savedWeight;
+            document.getElementById('setup-height').value = savedHeight;
+            document.getElementById('setup-sex').value = savedSex;
+            document.getElementById('setup-training-age').value = savedTraining;
+        });
+    });
+
     document.getElementById('setup-submit')?.addEventListener('click', async () => {
         const errEl = document.getElementById('setup-error');
         try {
+            let weightKg = parseFloat(document.getElementById('setup-weight').value);
+            let heightCm = parseFloat(document.getElementById('setup-height').value);
+
+            // Convert imperial to metric for storage
+            if (setupUnits === 'imperial') {
+                weightKg = weightKg * 0.453592;  // lbs to kg
+                heightCm = heightCm * 2.54;       // inches to cm
+            }
+
             const body = {
                 name: document.getElementById('setup-name').value.trim(),
                 age: parseInt(document.getElementById('setup-age').value),
-                weight_kg: parseFloat(document.getElementById('setup-weight').value),
-                height_cm: parseFloat(document.getElementById('setup-height').value),
+                weight_kg: Math.round(weightKg * 10) / 10,
+                height_cm: Math.round(heightCm * 10) / 10,
                 sex: document.getElementById('setup-sex').value,
                 training_age_yr: parseFloat(document.getElementById('setup-training-age').value) || 0,
+                unit_system: setupUnits,
             };
             await api('/auth/setup-profile', { method: 'POST', body: JSON.stringify(body) });
             currentUser = null;
@@ -685,12 +733,195 @@ function renderConfigPage() {
 }
 
 function bindConfig() {
+    document.getElementById('config-edit-profile')?.addEventListener('click', () => {
+        showEditProfileModal();
+    });
     document.getElementById('config-logout')?.addEventListener('click', () => {
         showLogoutConfirm();
     });
     document.getElementById('config-settings')?.addEventListener('click', () => {
         showSettingsModal();
     });
+}
+
+function showEditProfileModal() {
+    const u = currentUser;
+    const isMetric = (u.unit_system || 'metric') === 'metric';
+    let editUnits = u.unit_system || 'metric';
+
+    // Convert stored metric values to display units
+    const displayWeight = isMetric ? (u.weight_kg || '') : (u.weight_kg ? Math.round(u.weight_kg / 0.453592 * 10) / 10 : '');
+    const displayHeight = isMetric ? (u.height_cm || '') : (u.height_cm ? Math.round(u.height_cm / 2.54 * 10) / 10 : '');
+    const weightLabel = isMetric ? 'Weight (kg)' : 'Weight (lbs)';
+    const heightLabel = isMetric ? 'Height (cm)' : 'Height (in)';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+
+    function renderEditForm() {
+        const m = editUnits === 'metric';
+        const wLabel = m ? 'Weight (kg)' : 'Weight (lbs)';
+        const hLabel = m ? 'Height (cm)' : 'Height (in)';
+        // Recalculate display values based on current editUnits
+        const dw = m ? (u.weight_kg || '') : (u.weight_kg ? Math.round(u.weight_kg / 0.453592 * 10) / 10 : '');
+        const dh = m ? (u.height_cm || '') : (u.height_cm ? Math.round(u.height_cm / 2.54 * 10) / 10 : '');
+
+        return `
+        <div class="readiness-modal">
+            <div class="readiness-title">Edit Profile</div>
+            <div id="edit-profile-error" class="error-msg" style="display:none"></div>
+            <div id="edit-profile-success" class="success-msg" style="display:none"></div>
+            <div class="form-group">
+                <label class="form-label">Units</label>
+                <div class="unit-toggle" id="edit-unit-toggle">
+                    <button class="unit-toggle-btn ${m ? 'active' : ''}" data-unit="metric">Metric</button>
+                    <button class="unit-toggle-btn ${!m ? 'active' : ''}" data-unit="imperial">Imperial</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input class="form-input" id="edit-username" type="text" value="${u.username || ''}" autocapitalize="none">
+            </div>
+            <div class="form-group">
+                <label class="form-label">New Password (leave blank to keep current)</label>
+                <input class="form-input" id="edit-password" type="password" placeholder="Unchanged" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input class="form-input" id="edit-name" type="text" value="${u.name || ''}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Age</label>
+                <input class="form-input" id="edit-age" type="number" min="10" max="100" value="${u.age || ''}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">${wLabel}</label>
+                <input class="form-input" id="edit-weight" type="number" step="0.1" min="1" value="${dw}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">${hLabel}</label>
+                <input class="form-input" id="edit-height" type="number" step="0.1" min="1" value="${dh}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Sex</label>
+                <select class="form-select" id="edit-sex">
+                    <option value="male" ${u.sex === 'male' ? 'selected' : ''}>Male</option>
+                    <option value="female" ${u.sex === 'female' ? 'selected' : ''}>Female</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Training Age (years)</label>
+                <input class="form-input" id="edit-training-age" type="number" step="0.5" min="0" value="${u.training_age_yr || 0}">
+            </div>
+            <button class="btn btn-primary" id="edit-profile-save">Save Changes</button>
+            <button class="btn btn-secondary" id="edit-profile-cancel" style="margin-top:8px">Cancel</button>
+        </div>`;
+    }
+
+    overlay.innerHTML = renderEditForm();
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    function bindEditForm() {
+        const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+        document.getElementById('edit-profile-cancel')?.addEventListener('click', close);
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+        // Unit toggle inside modal
+        overlay.querySelectorAll('#edit-unit-toggle .unit-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Save current form values before re-render
+                const savedUsername = document.getElementById('edit-username')?.value || '';
+                const savedPassword = document.getElementById('edit-password')?.value || '';
+                const savedName = document.getElementById('edit-name')?.value || '';
+                const savedAge = document.getElementById('edit-age')?.value || '';
+                const savedSex = document.getElementById('edit-sex')?.value || 'male';
+                const savedTraining = document.getElementById('edit-training-age')?.value || '0';
+
+                editUnits = btn.dataset.unit;
+                overlay.innerHTML = renderEditForm();
+                bindEditForm();
+
+                // Restore non-unit fields
+                document.getElementById('edit-username').value = savedUsername;
+                document.getElementById('edit-password').value = savedPassword;
+                document.getElementById('edit-name').value = savedName;
+                document.getElementById('edit-age').value = savedAge;
+                document.getElementById('edit-sex').value = savedSex;
+                document.getElementById('edit-training-age').value = savedTraining;
+            });
+        });
+
+        document.getElementById('edit-profile-save')?.addEventListener('click', async () => {
+            const errEl = document.getElementById('edit-profile-error');
+            const successEl = document.getElementById('edit-profile-success');
+            errEl.style.display = 'none';
+            successEl.style.display = 'none';
+
+            try {
+                const body = {};
+
+                const newUsername = document.getElementById('edit-username').value.trim();
+                if (newUsername && newUsername !== u.username) body.username = newUsername;
+
+                const newPassword = document.getElementById('edit-password').value;
+                if (newPassword) body.password = newPassword;
+
+                const newName = document.getElementById('edit-name').value.trim();
+                if (newName && newName !== u.name) body.name = newName;
+
+                const newAge = parseInt(document.getElementById('edit-age').value);
+                if (!isNaN(newAge) && newAge !== u.age) body.age = newAge;
+
+                const newSex = document.getElementById('edit-sex').value;
+                if (newSex !== u.sex) body.sex = newSex;
+
+                const newTraining = parseFloat(document.getElementById('edit-training-age').value);
+                if (!isNaN(newTraining) && newTraining !== u.training_age_yr) body.training_age_yr = newTraining;
+
+                if (editUnits !== (u.unit_system || 'metric')) body.unit_system = editUnits;
+
+                // Weight & height: convert from display units to metric for storage
+                let newWeight = parseFloat(document.getElementById('edit-weight').value);
+                if (!isNaN(newWeight)) {
+                    if (editUnits === 'imperial') newWeight = newWeight * 0.453592;
+                    newWeight = Math.round(newWeight * 10) / 10;
+                    if (newWeight !== u.weight_kg) body.weight_kg = newWeight;
+                }
+
+                let newHeight = parseFloat(document.getElementById('edit-height').value);
+                if (!isNaN(newHeight)) {
+                    if (editUnits === 'imperial') newHeight = newHeight * 2.54;
+                    newHeight = Math.round(newHeight * 10) / 10;
+                    if (newHeight !== u.height_cm) body.height_cm = newHeight;
+                }
+
+                if (Object.keys(body).length === 0) {
+                    errEl.textContent = 'No changes to save';
+                    errEl.style.display = '';
+                    return;
+                }
+
+                await api('/auth/profile', { method: 'PUT', body: JSON.stringify(body) });
+
+                successEl.textContent = 'Profile updated';
+                successEl.style.display = '';
+
+                // Refresh user data
+                currentUser = await api('/auth/me');
+                // Update local reference
+                Object.assign(u, currentUser);
+
+                // Auto-close after a moment
+                setTimeout(close, 800);
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = '';
+            }
+        });
+    }
+
+    bindEditForm();
 }
 
 async function showSettingsModal() {

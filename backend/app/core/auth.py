@@ -62,7 +62,8 @@ def get_current_user(
         with conn.cursor() as cur:
             cur.execute(
                 """SELECT id, username, name, age, weight_kg, height_cm,
-                          sex, training_age_yr, equipment, profile_complete
+                          sex, training_age_yr, equipment, unit_system,
+                          profile_complete
                    FROM users WHERE id = %s""",
                 (user_id,),
             )
