@@ -14,7 +14,7 @@
   <Overview>wodGod is a stateful CrossFit programming engine for up to 10 athletes. It generates personalized workouts via an LLM, stores training history in PostgreSQL, and enforces programming rules and safety constraints. The app automatically creates the database and schema on first startup.</Overview>
   <Category>Productivity:</Category>
   <WebUI>http://[IP]:[PORT:8000]</WebUI>
-  <Icon>https://raw.githubusercontent.com/TheOrangeStuff/wodGod/main/backend/static/icon-512.png</Icon>
+  <Icon>https://raw.githubusercontent.com/TheOrangeStuff/wodGod/master/unraid/Gemini_Generated_Image_8vsbqo8vsbqo8vsb.png</Icon>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
   <Description>wodGod - AI-powered CrossFit programming engine. Generates personalized workouts using LLM, tracks training history, and enforces programming rules. Requires an external PostgreSQL instance and an Ollama (or OpenAI-compatible) LLM server. Auto-creates the database and schema on startup.</Description>
 
