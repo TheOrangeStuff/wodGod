@@ -546,7 +546,7 @@ function renderConfigPage() {
             <span class="profile-menu-arrow">&#8250;</span>
         </div>
         <div class="profile-menu-item" id="config-settings">
-            <span>Settings</span>
+            <span>AI Selection</span>
             <span class="profile-menu-arrow">&#8250;</span>
         </div>
         <div class="profile-menu-item profile-menu-logout" id="config-logout">
@@ -569,7 +569,7 @@ async function showSettingsModal() {
     overlay.className = 'readiness-overlay';
     overlay.innerHTML = `
     <div class="readiness-modal">
-        <div class="readiness-title">Settings</div>
+        <div class="readiness-title">AI Selection</div>
         <div class="form-group">
             <label class="form-label">AI Model</label>
             <div id="llm-list" class="llm-list"><div class="loading" style="min-height:auto;padding:12px 0">Loading...</div></div>
