@@ -5,9 +5,10 @@ import os
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import auth, workouts, logs, programs
 from app.core.bootstrap import bootstrap_database
@@ -34,6 +35,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.endswith(('.js', '.css', '.html')) or request.url.path == '/':
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+
+app.add_middleware(NoCacheStaticMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
