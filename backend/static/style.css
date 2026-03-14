@@ -50,7 +50,7 @@ body {
 .header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     padding: 16px 0;
     border-bottom: 1px solid var(--border);
     margin-bottom: 20px;
@@ -64,57 +64,6 @@ body {
 
 .header h1 span {
     color: var(--accent);
-}
-
-.header-user {
-    font-size: 12px;
-    color: var(--text-dim);
-    cursor: pointer;
-}
-
-/* User dropdown menu */
-.user-menu-wrapper {
-    position: relative;
-}
-
-.user-dropdown {
-    display: none;
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    min-width: 160px;
-    z-index: 150;
-    overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-.user-dropdown.open {
-    display: block;
-}
-
-.user-dropdown-item {
-    padding: 12px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text);
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.user-dropdown-item:hover {
-    background: var(--surface2);
-}
-
-.user-dropdown-divider {
-    height: 1px;
-    background: var(--border);
-}
-
-.user-dropdown-logout {
-    color: var(--red);
 }
 
 /* Navigation */
@@ -531,6 +480,45 @@ body {
     font-weight: 700;
     margin-bottom: 20px;
     text-align: center;
+}
+
+/* Profile menu */
+.profile-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.profile-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.profile-menu-item:hover {
+    border-color: var(--accent);
+}
+
+.profile-menu-arrow {
+    color: var(--text-dim);
+    font-size: 18px;
+}
+
+.profile-menu-logout {
+    color: var(--red);
+    margin-top: 16px;
+}
+
+.profile-menu-logout:hover {
+    border-color: var(--red);
 }
 
 /* Section title */
