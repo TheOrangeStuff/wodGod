@@ -49,5 +49,5 @@
   <!-- Claude (Anthropic) API -->
   <Config Name="Claude API Key" Target="CLAUDE_API_KEY" Default="" Mode="" Description="Anthropic API key for Claude. Leave blank to disable Claude as an option. Get one at https://console.anthropic.com/" Type="Variable" Display="always" Required="false" Mask="true"></Config>
 
-  <Config Name="Claude Model" Target="CLAUDE_MODEL" Default="claude-sonnet-4-20250514" Mode="" Description="Claude model to use (e.g. claude-sonnet-4-20250514, claude-haiku-4-5-20251001)." Type="Variable" Display="advanced" Required="false" Mask="false">claude-sonnet-4-20250514</Config>
+  <Config Name="Claude Model" Target="CLAUDE_MODEL" Default="claude-sonnet-4-6" Mode="" Description="Claude model to use (e.g. claude-sonnet-4-6, claude-haiku-4-5)." Type="Variable" Display="advanced" Required="false" Mask="false">claude-sonnet-4-6</Config>
 </Container>
