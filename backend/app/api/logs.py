@@ -67,6 +67,39 @@ def log_workout(
             }
 
 
+@router.put("/logs/{log_id}")
+def update_log(
+    log_id: str,
+    log_input: WorkoutLogInput,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Update an existing workout log."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE workout_logs
+                   SET actual_rpe = %s, missed_reps = %s,
+                       performance_json = %s, notes = %s
+                   WHERE id = %s AND user_id = %s
+                   RETURNING id, completed_at""",
+                (
+                    log_input.actual_rpe,
+                    log_input.missed_reps,
+                    json.dumps(log_input.performance_json),
+                    log_input.notes,
+                    log_id,
+                    user_id,
+                ),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Log not found")
+            return {
+                "log_id": str(row["id"]),
+                "completed_at": row["completed_at"].isoformat(),
+            }
+
+
 @router.get("/logs")
 def list_logs(limit: int = 20, user_id: str = Depends(get_current_user_id)):
     """List recent workout logs."""

@@ -430,6 +430,16 @@ body {
     margin-bottom: 4px;
 }
 
+.history-detail-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.history-detail-actions .btn {
+    flex: 1;
+}
+
 .history-detail-notes {
     font-size: 13px;
     color: var(--text-dim);
