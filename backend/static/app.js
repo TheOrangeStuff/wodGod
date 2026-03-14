@@ -197,7 +197,15 @@ function renderHeader() {
     return `
     <div class="header">
         <h1>wod<span>God</span></h1>
-        <div class="header-user" id="logout-btn">${currentUser?.name || currentUser?.username} &#x2715;</div>
+        <div class="user-menu-wrapper">
+            <div class="header-user" id="user-menu-btn">${currentUser?.name || currentUser?.username} &#x25BE;</div>
+            <div class="user-dropdown" id="user-dropdown">
+                <div class="user-dropdown-item" id="menu-profile">Profile</div>
+                <div class="user-dropdown-item" id="menu-settings">Settings</div>
+                <div class="user-dropdown-divider"></div>
+                <div class="user-dropdown-item user-dropdown-logout" id="menu-logout">Logout</div>
+            </div>
+        </div>
     </div>`;
 }
 
@@ -223,11 +231,66 @@ function bindNav() {
             render();
         });
     });
-    document.getElementById('logout-btn')?.addEventListener('click', () => {
+    bindUserMenu();
+}
+
+function bindUserMenu() {
+    const menuBtn = document.getElementById('user-menu-btn');
+    const dropdown = document.getElementById('user-dropdown');
+    if (!menuBtn || !dropdown) return;
+
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', () => {
+        dropdown.classList.remove('open');
+    });
+
+    dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    document.getElementById('menu-profile')?.addEventListener('click', () => {
+        dropdown.classList.remove('open');
+        // Profile — not yet implemented
+    });
+
+    document.getElementById('menu-settings')?.addEventListener('click', () => {
+        dropdown.classList.remove('open');
+        // Settings — not yet implemented
+    });
+
+    document.getElementById('menu-logout')?.addEventListener('click', () => {
+        dropdown.classList.remove('open');
+        showLogoutConfirm();
+    });
+}
+
+function showLogoutConfirm() {
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal" style="text-align:center">
+        <div class="readiness-title">Log Out</div>
+        <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px">Are you sure you want to log out?</p>
+        <button class="btn btn-primary" id="confirm-logout" style="background:var(--red)">Log Out</button>
+        <button class="btn btn-secondary" id="cancel-logout" style="margin-top:8px">Cancel</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('confirm-logout').addEventListener('click', () => {
+        overlay.remove();
         token = null;
         currentUser = null;
         localStorage.removeItem('wodgod_token');
         render();
+    });
+
+    document.getElementById('cancel-logout').addEventListener('click', () => {
+        overlay.remove();
     });
 }
 
@@ -343,9 +406,7 @@ async function loadWod() {
 
         // Bind log button
         document.getElementById('start-wod-btn')?.addEventListener('click', () => showLogModal());
-        document.getElementById('logout-btn')?.addEventListener('click', () => {
-            token = null; currentUser = null; localStorage.removeItem('wodgod_token'); render();
-        });
+        bindUserMenu();
     } catch (e) {
         wodLoaded = true;
         todayWod = null;
@@ -472,9 +533,7 @@ async function loadCalendar() {
         content += renderNav();
         app.innerHTML = content;
         bindNav();
-        document.getElementById('logout-btn')?.addEventListener('click', () => {
-            token = null; currentUser = null; localStorage.removeItem('wodgod_token'); render();
-        });
+        bindUserMenu();
 
         // Bind generate button if present
         document.getElementById('gen-week-btn')?.addEventListener('click', async () => {
@@ -535,9 +594,7 @@ async function loadHistory() {
         content += renderNav();
         app.innerHTML = content;
         bindNav();
-        document.getElementById('logout-btn')?.addEventListener('click', () => {
-            token = null; currentUser = null; localStorage.removeItem('wodgod_token'); render();
-        });
+        bindUserMenu();
     } catch {
         historyData = [];
         render();
