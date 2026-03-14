@@ -41,7 +41,7 @@ psql $DATABASE_URL -f db/seeds/001_seed_data.sql
 ```
 backend/
   app/
-    main.py              # FastAPI entry point
+    main.py              # FastAPI entry point + NoCacheStaticMiddleware
     api/
       auth.py            # Auth & profile endpoints
       workouts.py        # Workout CRUD & generation
@@ -50,7 +50,9 @@ backend/
     core/
       config.py          # Settings from env vars
       auth.py            # JWT, password hashing, middleware
+      bootstrap.py       # Database auto-creation on startup
       database.py        # Postgres connection & context manager
+      migrate.py         # Auto-migration runner (schema_migrations table)
     models/
       auth.py            # Pydantic auth models
       workout.py         # Pydantic workout schemas
@@ -61,13 +63,17 @@ backend/
       validation_service.py  # Workout validation rules
   static/
     index.html           # SPA shell
-    app.js               # Vanilla JS app (auth, wod, calendar, history)
+    index.html           # SPA shell (cache-busted v= query params)
+    app.js               # Vanilla JS app (auth, wod, calendar, history, profile)
     style.css            # Dark mode, mobile-first CSS
 db/
   init.sh                # DB init orchestrator (runs on container start)
-  migrations/            # Schema DDL (001_schema.sql, 002_auth_multiuser.sql)
+  migrations/            # Schema DDL (001–003)
   functions/             # SQL functions (fn_build_system_state)
   seeds/                 # Demo user & movement taxonomy
+unraid/
+  wodgod.xml             # Unraid Docker template for App Store installation
+  Gemini_Generated_*.png # Container logo image
 ```
 
 ## Key Commands
@@ -95,7 +101,7 @@ psql $DATABASE_URL -f db/migrations/001_schema.sql
 - **SQL:** Raw parameterized queries via psycopg2 RealDictCursor. No ORM.
 - **Database:** snake_case tables, ENUM types, UUIDs via `gen_random_uuid()`, `created_at`/`updated_at` timestamps (TIMESTAMPTZ).
 - **API:** RESTful paths, Bearer token auth, JSON request/response bodies. Status codes: 200, 201, 401, 404, 409, 422.
-- **Frontend:** Single-page app with view routing via `currentView`. kebab-case CSS classes, camelCase JS functions. Dark mode only, mobile-first (max-width 480px).
+- **Frontend:** Single-page app with view routing via `currentView` (wod, calendar, history, profile). kebab-case CSS classes, camelCase JS functions. Dark mode only, mobile-first (max-width 480px). Static assets served with no-cache headers via `NoCacheStaticMiddleware`; cache-busted `?v=N` query params in `index.html`.
 - **No formal test suite or linter configured yet.**
 
 ## API Endpoints
@@ -125,17 +131,32 @@ See `.env.example` for all configuration. Key variables:
 - `LLM_MODEL` — Model name (e.g., `llama3`)
 - `DATABASE_URL` — Full connection string pointing to the externally-provided Postgres instance
 
-## Development Status (as of 2026-03-12)
+## Development Status (as of 2026-03-14)
 
 ### Infrastructure Setup
-- [x] `.env` configured with DATABASE_URL pointing to external Postgres instance
-- [x] PostgreSQL connection verified (Python `psycopg2` connect test returned "connected!")
-- [x] Backend started via `docker compose up -d backend` (both `db` and `backend` services running)
-- [x] Auto-migration added — backend now applies all SQL migrations on startup via `schema_migrations` tracking table. Rebuild backend to pick up: `docker compose up -d --build backend`
+- [x] `.env` configured with individual Postgres credentials (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD)
+- [x] PostgreSQL connection verified
+- [x] Backend started via `docker compose up -d backend`
+- [x] Auto-migration added — backend applies all SQL migrations on startup via `schema_migrations` tracking table
+- [x] Database auto-creation on startup via `bootstrap.py`
+- [x] CI/CD: GitHub Actions workflow builds and pushes Docker image to GHCR with `:latest` tag on master merges
+- [x] Unraid template (`unraid/wodgod.xml`) with container logo
+- [x] bcrypt/passlib compatibility fixed (bcrypt pinned to 4.0.1)
+- [x] Static asset caching fixed — no-cache middleware + cache-busted query params in index.html
 - [ ] LLM provider configured and reachable
 
+### Frontend
+- [x] Auth flow (login/register)
+- [x] First-time profile setup
+- [x] WOD view (today's workout display + log modal)
+- [x] Calendar view (weekly overview + generate week)
+- [x] History view (completed workout logs)
+- [x] Profile page (Edit Profile, Settings — placeholders; Log Out with confirmation modal)
+- [x] Centered header with wodGod branding
+- [x] 4-tab bottom navigation (WOD, Calendar, History, Profile)
+
 ### User Testing
-- [ ] Login to the app (demo/demo or new account) — rebuild backend first to trigger auto-migration
+- [ ] Login to the app (demo/demo or new account)
 - [ ] Set up athlete profile
 - [ ] Generate a workout
 - [ ] Log a completed workout
