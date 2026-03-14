@@ -28,7 +28,7 @@ docker compose up -d backend
 # Demo account: demo / demo
 ```
 
-To manually re-run migrations (if needed):
+To initialize the database schema on a fresh Postgres instance, run the SQL files in order:
 ```bash
 psql $DATABASE_URL -f db/migrations/001_schema.sql
 psql $DATABASE_URL -f db/migrations/002_auth_multiuser.sql
