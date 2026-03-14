@@ -499,10 +499,10 @@ function renderHistoryPage() {
     if (!historyData) return html + '<div class="loading">Loading history...</div>';
     if (historyData.length === 0) return html + '<div class="empty">No completed workouts yet.</div>';
 
-    historyData.forEach(log => {
+    historyData.forEach((log, idx) => {
         const date = new Date(log.completed_at);
         const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        html += `<div class="history-item">
+        html += `<div class="history-item" data-history-idx="${idx}">
             <div class="history-header">
                 <span class="history-focus">${log.focus}</span>
                 <span class="history-date">${dateStr}</span>
@@ -519,6 +519,73 @@ function renderHistoryPage() {
     return html;
 }
 
+function showHistoryDetail(log) {
+    const wj = typeof log.workout_json === 'string' ? JSON.parse(log.workout_json) : (log.workout_json || {});
+    const completedDate = new Date(log.completed_at);
+    const dateStr = completedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = completedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+    let details = '';
+
+    if (wj.primary_strength) {
+        details += renderStrengthSection('Primary Strength', wj.primary_strength);
+    }
+    if (wj.secondary_strength) {
+        details += renderStrengthSection('Secondary Strength', wj.secondary_strength);
+    }
+    if (wj.conditioning) {
+        details += `<div class="wod-section">
+            <div class="wod-section-title">${(wj.conditioning.type || 'WOD').toUpperCase()} — ${wj.conditioning.time_cap_minutes} min</div>`;
+        (wj.conditioning.movements || []).forEach(m => {
+            details += `<div class="wod-movement">
+                <span class="wod-movement-name">${formatMovement(m.movement)}</span>
+                <span class="wod-movement-detail">${m.reps ? m.reps + ' reps' : m.distance_m ? m.distance_m + 'm' : m.calories ? m.calories + ' cal' : ''}</span>
+            </div>`;
+        });
+        details += '</div>';
+    }
+    if (wj.aerobic_prescription) {
+        details += `<div class="wod-section">
+            <div class="wod-section-title">Aerobic — ${wj.aerobic_prescription.type}</div>
+            <div class="wod-movement">
+                <span class="wod-movement-name">${formatMovement(wj.aerobic_prescription.modality)}</span>
+                <span class="wod-movement-detail">${wj.aerobic_prescription.duration_minutes} min</span>
+            </div>
+        </div>`;
+    }
+    if (wj.mobility_prompt) {
+        details += `<div class="wod-section">
+            <div class="wod-section-title">Mobility</div>
+            <div class="mobility-text">${wj.mobility_prompt}</div>
+        </div>`;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">${log.focus}</div>
+        <div class="history-detail-meta">
+            <span>Completed ${dateStr} at ${timeStr}</span>
+            <span>Week ${log.program_week}, Day ${log.day_index}</span>
+        </div>
+        <div class="history-detail-stats">
+            <span class="wod-tag tag-rpe">RPE ${log.actual_rpe}</span>
+            ${log.missed_reps > 0 ? `<span class="wod-tag" style="background:var(--red)">Missed ${log.missed_reps} reps</span>` : ''}
+        </div>
+        ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
+        ${log.notes ? `<div class="history-detail-notes">${log.notes}</div>` : ''}
+        <button class="btn btn-secondary" id="history-detail-close">Close</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+    document.getElementById('history-detail-close').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+
 async function loadHistory() {
     try {
         historyData = await api('/logs?limit=50');
@@ -528,6 +595,12 @@ async function loadHistory() {
         content += renderNav();
         app.innerHTML = content;
         bindNav();
+        document.querySelectorAll('.history-item[data-history-idx]').forEach(el => {
+            el.addEventListener('click', () => {
+                const idx = parseInt(el.dataset.historyIdx);
+                if (historyData[idx]) showHistoryDetail(historyData[idx]);
+            });
+        });
     } catch {
         historyData = [];
         render();
