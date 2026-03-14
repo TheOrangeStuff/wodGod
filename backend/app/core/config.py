@@ -31,6 +31,13 @@ class Settings:
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
 
+    # Claude API (Anthropic)
+    CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
+    CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+
+    # Active LLM selection (runtime-switchable, defaults to LLM_PROVIDER)
+    active_llm: str = os.getenv("LLM_PROVIDER", "ollama")
+
     # JWT
     JWT_SECRET: str = os.getenv("JWT_SECRET", "change-me-in-production")
     JWT_ALGORITHM: str = "HS256"

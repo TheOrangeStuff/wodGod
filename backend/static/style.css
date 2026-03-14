@@ -544,6 +544,44 @@ body {
     line-height: 1.5;
 }
 
+/* LLM selector */
+.llm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.llm-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.llm-option:hover {
+    border-color: var(--accent);
+}
+
+.llm-option.active {
+    border-color: var(--green);
+}
+
+.llm-option-name {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.llm-option-check {
+    color: var(--green);
+    font-size: 16px;
+    font-weight: 700;
+}
+
 .page-title {
     font-size: 18px;
     font-weight: 700;

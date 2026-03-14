@@ -49,7 +49,7 @@ function render() {
     if (currentView === 'wod') content += renderWodPage();
     else if (currentView === 'calendar') content += renderCalendarPage();
     else if (currentView === 'history') content += renderHistoryPage();
-    else if (currentView === 'profile') content += renderProfilePage();
+    else if (currentView === 'config') content += renderConfigPage();
     content += renderNav();
 
     app.innerHTML = content;
@@ -57,7 +57,7 @@ function render() {
     if (currentView === 'wod') loadWod();
     else if (currentView === 'calendar') loadCalendar();
     else if (currentView === 'history') loadHistory();
-    else if (currentView === 'profile') bindProfile();
+    else if (currentView === 'config') bindConfig();
 }
 
 // ============================================================
@@ -215,8 +215,8 @@ function renderNav() {
         <button class="nav-btn ${currentView === 'history' ? 'active' : ''}" data-view="history">
             <span class="nav-btn-icon">&#128200;</span>History
         </button>
-        <button class="nav-btn ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
-            <span class="nav-btn-icon">&#9881;</span>Profile
+        <button class="nav-btn ${currentView === 'config' ? 'active' : ''}" data-view="config">
+            <span class="nav-btn-icon">&#9881;</span>Config
         </button>
     </div></nav>`;
 }
@@ -535,31 +535,106 @@ async function loadHistory() {
 }
 
 // ============================================================
-// Profile
+// Config
 // ============================================================
-function renderProfilePage() {
+function renderConfigPage() {
     return `
-    <div class="page-title">Profile</div>
+    <div class="page-title">Config</div>
     <div class="profile-menu">
-        <div class="profile-menu-item" id="profile-edit">
+        <div class="profile-menu-item" id="config-edit-profile">
             <span>Edit Profile</span>
             <span class="profile-menu-arrow">&#8250;</span>
         </div>
-        <div class="profile-menu-item" id="profile-settings">
+        <div class="profile-menu-item" id="config-settings">
             <span>Settings</span>
             <span class="profile-menu-arrow">&#8250;</span>
         </div>
-        <div class="profile-menu-item profile-menu-logout" id="profile-logout">
+        <div class="profile-menu-item profile-menu-logout" id="config-logout">
             <span>Log Out</span>
         </div>
     </div>`;
 }
 
-function bindProfile() {
-    document.getElementById('profile-logout')?.addEventListener('click', () => {
+function bindConfig() {
+    document.getElementById('config-logout')?.addEventListener('click', () => {
         showLogoutConfirm();
     });
-    // Edit Profile and Settings — no-op for now
+    document.getElementById('config-settings')?.addEventListener('click', () => {
+        showSettingsModal();
+    });
+}
+
+async function showSettingsModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">Settings</div>
+        <div class="form-group">
+            <label class="form-label">AI Model</label>
+            <div id="llm-list" class="llm-list"><div class="loading" style="min-height:auto;padding:12px 0">Loading...</div></div>
+        </div>
+        <div id="llm-status" style="display:none;text-align:center;font-size:13px;font-weight:600;margin-bottom:12px"></div>
+        <button class="btn btn-secondary" id="settings-close">Close</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    document.getElementById('settings-close').addEventListener('click', () => overlay.remove());
+
+    // Load available providers
+    try {
+        const data = await api('/settings/llm');
+        const listEl = document.getElementById('llm-list');
+        if (data.providers.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:8px 0">No AI models configured.</div>';
+            return;
+        }
+        listEl.innerHTML = data.providers.map(p => `
+            <div class="llm-option ${p.id === data.active ? 'active' : ''}" data-provider="${p.id}">
+                <span class="llm-option-name">${p.name}</span>
+                <span class="llm-option-check">${p.id === data.active ? '&#10003;' : ''}</span>
+            </div>
+        `).join('');
+
+        listEl.querySelectorAll('.llm-option').forEach(el => {
+            el.addEventListener('click', async () => {
+                const providerId = el.dataset.provider;
+                const statusEl = document.getElementById('llm-status');
+
+                // Disable all options while testing
+                listEl.querySelectorAll('.llm-option').forEach(o => o.style.pointerEvents = 'none');
+                statusEl.style.display = '';
+                statusEl.style.color = 'var(--text-dim)';
+                statusEl.textContent = 'Testing connection...';
+
+                try {
+                    const result = await api(`/settings/llm/${providerId}`, { method: 'POST' });
+                    if (result.ok) {
+                        statusEl.style.color = 'var(--green)';
+                        statusEl.textContent = `AI ${result.name} Enabled`;
+                        // Update active state
+                        listEl.querySelectorAll('.llm-option').forEach(o => {
+                            o.classList.remove('active');
+                            o.querySelector('.llm-option-check').textContent = '';
+                        });
+                        el.classList.add('active');
+                        el.querySelector('.llm-option-check').textContent = '\u2713';
+                    } else {
+                        const pName = el.querySelector('.llm-option-name').textContent;
+                        statusEl.style.color = 'var(--red)';
+                        statusEl.textContent = `AI ${pName} Unavailable`;
+                    }
+                } catch (e) {
+                    statusEl.style.color = 'var(--red)';
+                    statusEl.textContent = 'Connection failed';
+                }
+
+                listEl.querySelectorAll('.llm-option').forEach(o => o.style.pointerEvents = '');
+            });
+        });
+    } catch {
+        document.getElementById('llm-list').innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load settings.</div>';
+    }
 }
 
 function showLogoutConfirm() {
