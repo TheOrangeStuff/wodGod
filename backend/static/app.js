@@ -3,7 +3,7 @@
 const API = '';
 let token = localStorage.getItem('wodgod_token');
 let currentUser = null;
-let currentView = 'wod';
+let currentView = 'workouts';
 
 // ============================================================
 // API Helper
@@ -46,17 +46,13 @@ function render() {
     }
 
     let content = renderHeader();
-    if (currentView === 'wod') content += renderWodPage();
-    else if (currentView === 'calendar') content += renderCalendarPage();
-    else if (currentView === 'history') content += renderHistoryPage();
+    if (currentView === 'workouts') content += renderWorkoutsPage();
     else if (currentView === 'config') content += renderConfigPage();
     content += renderNav();
 
     app.innerHTML = content;
     bindNav();
-    if (currentView === 'wod') loadWod();
-    else if (currentView === 'calendar') loadCalendar();
-    else if (currentView === 'history') loadHistory();
+    if (currentView === 'workouts') loadWorkouts();
     else if (currentView === 'config') bindConfig();
 }
 
@@ -101,7 +97,7 @@ function bindAuth() {
             token = data.token;
             localStorage.setItem('wodgod_token', token);
             currentUser = null;
-            currentView = 'wod';
+            currentView = 'workouts';
             render();
         } catch (e) {
             errEl.textContent = e.message;
@@ -206,14 +202,8 @@ function renderHeader() {
 function renderNav() {
     return `
     <nav class="nav"><div class="nav-inner">
-        <button class="nav-btn ${currentView === 'wod' ? 'active' : ''}" data-view="wod">
-            <span class="nav-btn-icon">&#9889;</span>WOD
-        </button>
-        <button class="nav-btn ${currentView === 'calendar' ? 'active' : ''}" data-view="calendar">
-            <span class="nav-btn-icon">&#128197;</span>Calendar
-        </button>
-        <button class="nav-btn ${currentView === 'history' ? 'active' : ''}" data-view="history">
-            <span class="nav-btn-icon">&#128200;</span>History
+        <button class="nav-btn ${currentView === 'workouts' ? 'active' : ''}" data-view="workouts">
+            <span class="nav-btn-icon">&#9889;</span>Workouts
         </button>
         <button class="nav-btn ${currentView === 'config' ? 'active' : ''}" data-view="config">
             <span class="nav-btn-icon">&#9881;</span>Config
@@ -231,122 +221,257 @@ function bindNav() {
 }
 
 // ============================================================
-// View WOD
+// Unified Workouts View
 // ============================================================
-let todayWod = null;
-let wodLoaded = false;
+let allWorkouts = null;
+let workoutsFilter = 'all'; // 'all', 'today', 'complete', 'missed', 'upcoming'
 
-function renderWodPage() {
-    if (!wodLoaded) return '<div class="loading">Loading today\'s WOD...</div>';
-    if (!todayWod || !todayWod.workout) {
-        return `
-        <div class="empty">
-            <p>No workout scheduled for today.</p>
-            <p style="margin-top:8px;font-size:12px;color:var(--text-dim)">Generate your week from the Calendar tab.</p>
-        </div>`;
-    }
+function renderWorkoutsPage() {
+    let html = '<div class="page-title">Workouts</div>';
 
-    const w = todayWod.workout;
-    const wj = typeof w.workout_json === 'string' ? JSON.parse(w.workout_json) : w.workout_json;
-    const logged = todayWod.logged;
-
-    let html = '';
-
-    // Meta tags
-    html += `<div class="wod-meta">
-        <span class="wod-tag tag-rpe">RPE ${w.intensity_target_rpe}</span>
-        <span class="wod-tag tag-cns-${w.cns_load}">CNS ${w.cns_load}</span>
+    // Filter tabs
+    html += `<div class="filter-tabs">
+        <button class="filter-tab ${workoutsFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+        <button class="filter-tab ${workoutsFilter === 'today' ? 'active' : ''}" data-filter="today">Today</button>
+        <button class="filter-tab ${workoutsFilter === 'upcoming' ? 'active' : ''}" data-filter="upcoming">Upcoming</button>
+        <button class="filter-tab ${workoutsFilter === 'complete' ? 'active' : ''}" data-filter="complete">Complete</button>
+        <button class="filter-tab ${workoutsFilter === 'missed' ? 'active' : ''}" data-filter="missed">Missed</button>
     </div>`;
 
-    html += `<div class="card"><div class="card-title">${w.focus}</div>`;
+    if (!allWorkouts) return html + '<div class="loading" style="min-height:auto;padding:40px 0">Loading workouts...</div>';
 
-    // Primary strength
-    if (wj.primary_strength) {
-        html += renderStrengthSection('Primary Strength', wj.primary_strength);
+    if (allWorkouts.length === 0) {
+        html += `<div class="empty">
+            <p>No workouts generated yet.</p>
+            <button class="btn btn-primary" id="gen-week-btn" style="margin-top:16px;max-width:260px;margin-left:auto;margin-right:auto">Generate This Week</button>
+        </div>`;
+        return html;
     }
-    // Secondary strength
-    if (wj.secondary_strength) {
-        html += renderStrengthSection('Secondary Strength', wj.secondary_strength);
+
+    const filtered = workoutsFilter === 'all'
+        ? allWorkouts
+        : allWorkouts.filter(w => w.status === workoutsFilter.toUpperCase());
+
+    if (filtered.length === 0) {
+        html += `<div class="empty">No ${workoutsFilter} workouts.</div>`;
     }
-    // Conditioning
-    if (wj.conditioning) {
-        html += `<div class="wod-section">
-            <div class="wod-section-title">${(wj.conditioning.type || 'WOD').toUpperCase()} — ${wj.conditioning.time_cap_minutes} min</div>`;
-        (wj.conditioning.movements || []).forEach(m => {
-            html += `<div class="wod-movement">
-                <span class="wod-movement-name">${formatMovement(m.movement)}</span>
-                <span class="wod-movement-detail">${m.reps ? m.reps + ' reps' : m.distance_m ? m.distance_m + 'm' : m.calories ? m.calories + ' cal' : ''}</span>
-            </div>`;
-        });
-        html += '</div>';
-    }
-    // Aerobic
-    if (wj.aerobic_prescription) {
-        html += `<div class="wod-section">
-            <div class="wod-section-title">Aerobic — ${wj.aerobic_prescription.type}</div>
-            <div class="wod-movement">
-                <span class="wod-movement-name">${formatMovement(wj.aerobic_prescription.modality)}</span>
-                <span class="wod-movement-detail">${wj.aerobic_prescription.duration_minutes} min</span>
+
+    const today = new Date().toISOString().split('T')[0];
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // Check if any upcoming workouts exist to decide whether to show generate button
+    const hasUpcoming = allWorkouts.some(w => w.status === 'UPCOMING');
+    const hasToday = allWorkouts.some(w => w.status === 'TODAY');
+
+    filtered.forEach((w, idx) => {
+        const d = new Date(w.scheduled_date + 'T12:00:00');
+        const dayName = days[d.getDay()];
+        const dayNum = d.getDate();
+        const monthStr = d.toLocaleDateString(undefined, { month: 'short' });
+        const isToday = w.scheduled_date === today;
+
+        const statusClass = `status-${w.status.toLowerCase()}`;
+        const statusLabel = w.status;
+
+        html += `<div class="workout-item ${statusClass}${isToday ? ' is-today' : ''}" data-workout-idx="${idx}" data-workout-id="${w.id}">
+            <div class="workout-date">
+                <div class="workout-date-day">${dayNum}</div>
+                <div class="workout-date-label">${dayName}</div>
+                <div class="workout-date-month">${monthStr}</div>
             </div>
-        </div>`;
-    }
-    // Mobility
-    if (wj.mobility_prompt) {
-        html += `<div class="wod-section">
-            <div class="wod-section-title">Mobility</div>
-            <div class="mobility-text">${wj.mobility_prompt}</div>
-        </div>`;
-    }
-
-    html += '</div>';
-
-    // Log button or logged status
-    if (logged) {
-        const log = todayWod.log;
-        html += `<div class="card" style="border-color: var(--green)">
-            <div class="card-title" style="color: var(--green)">Completed</div>
-            <div class="history-stats">
-                <span>RPE: ${log.actual_rpe}</span>
-                <span>${new Date(log.completed_at).toLocaleTimeString()}</span>
+            <div class="workout-info">
+                <div class="workout-focus">${w.focus}</div>
+                <div class="workout-detail">RPE ${w.intensity_target_rpe} | CNS ${w.cns_load}</div>
             </div>
+            <div class="workout-status-badge badge-${w.status.toLowerCase()}">${statusLabel}</div>
         </div>`;
-    } else {
-        html += `<button class="btn btn-primary" id="start-wod-btn">Log Workout</button>`;
+    });
+
+    // Generate week button at the bottom if no upcoming workouts
+    if (!hasUpcoming && !hasToday) {
+        html += `<button class="btn btn-primary" id="gen-week-btn" style="margin-top:16px">Generate This Week</button>`;
     }
 
     return html;
 }
 
-function renderStrengthSection(title, block) {
-    const pct = block.load_percentage ? `${Math.round(block.load_percentage * 100)}%` : '';
-    return `<div class="wod-section">
-        <div class="wod-section-title">${title}</div>
-        <div class="wod-movement">
-            <span class="wod-movement-name">${formatMovement(block.movement)}</span>
-            <span class="wod-movement-detail">${block.scheme} @ ${pct} | Rest ${block.rest_seconds}s</span>
-        </div>
-    </div>`;
-}
-
-async function loadWod() {
+async function loadWorkouts() {
     try {
-        todayWod = await api('/workouts/today');
-        wodLoaded = true;
-        // Re-render just the content
+        allWorkouts = await api('/workouts/all');
         const app = document.getElementById('app');
         let content = renderHeader();
-        content += renderWodPage();
+        content += renderWorkoutsPage();
         content += renderNav();
         app.innerHTML = content;
         bindNav();
-
-        // Bind log button
-        document.getElementById('start-wod-btn')?.addEventListener('click', () => showLogModal());
-    } catch (e) {
-        wodLoaded = true;
-        todayWod = null;
+        bindWorkoutsPage();
+    } catch {
+        allWorkouts = [];
         render();
     }
+}
+
+function bindWorkoutsPage() {
+    // Filter tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            workoutsFilter = tab.dataset.filter;
+            // Re-render just the content without refetching
+            const app = document.getElementById('app');
+            let content = renderHeader();
+            content += renderWorkoutsPage();
+            content += renderNav();
+            app.innerHTML = content;
+            bindNav();
+            bindWorkoutsPage();
+        });
+    });
+
+    // Workout item clicks
+    const filtered = workoutsFilter === 'all'
+        ? allWorkouts
+        : (allWorkouts || []).filter(w => w.status === workoutsFilter.toUpperCase());
+
+    document.querySelectorAll('.workout-item[data-workout-idx]').forEach(el => {
+        el.addEventListener('click', () => {
+            const idx = parseInt(el.dataset.workoutIdx);
+            if (filtered[idx]) showWorkoutDetail(filtered[idx]);
+        });
+    });
+
+    // Generate week button
+    document.getElementById('gen-week-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('gen-week-btn');
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+        try {
+            await api('/workouts/generate-week', { method: 'POST' });
+            allWorkouts = null;
+            render();
+        } catch (e) {
+            btn.textContent = 'Failed — Retry';
+            btn.disabled = false;
+        }
+    });
+}
+
+// ============================================================
+// Workout Detail Modal
+// ============================================================
+function showWorkoutDetail(workout) {
+    const wj = typeof workout.workout_json === 'string' ? JSON.parse(workout.workout_json) : (workout.workout_json || {});
+    const d = new Date(workout.scheduled_date + 'T12:00:00');
+    const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const details = renderWorkoutDetails(wj);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+
+    let statusBadge = `<span class="wod-tag badge-${workout.status.toLowerCase()}">${workout.status}</span>`;
+    let actionsHtml = '';
+
+    if (workout.status === 'TODAY') {
+        if (workout.log) {
+            // Already logged today
+            actionsHtml = `
+                <div class="history-detail-actions">
+                    <button class="btn btn-secondary" id="detail-close">Close</button>
+                </div>`;
+        } else {
+            actionsHtml = `
+                <div class="history-detail-actions">
+                    <button class="btn btn-primary" id="detail-log-btn">Log Workout</button>
+                    <button class="btn btn-secondary" id="detail-close">Close</button>
+                </div>`;
+        }
+    } else if (workout.status === 'COMPLETE') {
+        actionsHtml = `
+            <div class="history-detail-actions">
+                <button class="btn btn-secondary btn-sm" id="detail-edit-log">Edit Log</button>
+                <button class="btn btn-secondary btn-sm btn-danger-text" id="detail-mark-missed">Mark Missed</button>
+                <button class="btn btn-secondary btn-sm" id="detail-close">Close</button>
+            </div>`;
+    } else if (workout.status === 'MISSED') {
+        actionsHtml = `
+            <div class="history-detail-actions">
+                <button class="btn btn-primary btn-sm" id="detail-mark-complete">Mark Complete</button>
+                <button class="btn btn-secondary btn-sm" id="detail-close">Close</button>
+            </div>`;
+    } else {
+        // UPCOMING
+        actionsHtml = `
+            <div class="history-detail-actions">
+                <button class="btn btn-secondary" id="detail-close">Close</button>
+            </div>`;
+    }
+
+    // Show log info if available
+    let logInfo = '';
+    if (workout.log) {
+        const completedDate = new Date(workout.log.completed_at);
+        const timeStr = completedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        logInfo = `<div class="detail-log-info">
+            <span>RPE: ${workout.log.actual_rpe}</span>
+            <span>Logged at ${timeStr}</span>
+            ${workout.log.missed_reps > 0 ? `<span style="color:var(--red)">Missed: ${workout.log.missed_reps} reps</span>` : ''}
+        </div>`;
+        if (workout.log.notes) {
+            logInfo += `<div class="history-detail-notes">${workout.log.notes}</div>`;
+        }
+    }
+
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">${workout.focus}</div>
+        <div class="history-detail-meta">
+            <span>${dateStr} — Week ${workout.program_week}, Day ${workout.day_index}</span>
+        </div>
+        <div class="history-detail-stats">
+            <span class="wod-tag tag-rpe">RPE ${workout.intensity_target_rpe}</span>
+            <span class="wod-tag tag-cns-${workout.cns_load}">CNS ${workout.cns_load}</span>
+            ${statusBadge}
+        </div>
+        ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
+        ${logInfo}
+        ${actionsHtml}
+    </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+    document.getElementById('detail-close')?.addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    // Log workout (TODAY)
+    document.getElementById('detail-log-btn')?.addEventListener('click', () => {
+        close();
+        showLogModal(workout);
+    });
+
+    // Edit log (COMPLETE)
+    document.getElementById('detail-edit-log')?.addEventListener('click', () => {
+        close();
+        showEditLogModal(workout);
+    });
+
+    // Mark as MISSED (remove log)
+    document.getElementById('detail-mark-missed')?.addEventListener('click', async () => {
+        try {
+            await api(`/workouts/${workout.id}/log`, { method: 'DELETE' });
+            close();
+            allWorkouts = null;
+            render();
+        } catch (e) {
+            alert('Failed to update: ' + e.message);
+        }
+    });
+
+    // Mark as COMPLETE (add log)
+    document.getElementById('detail-mark-complete')?.addEventListener('click', () => {
+        close();
+        showLogModal(workout);
+    });
 }
 
 // ============================================================
@@ -354,7 +479,7 @@ async function loadWod() {
 // ============================================================
 let selectedRpe = 7;
 
-function showLogModal() {
+function showLogModal(workout) {
     const overlay = document.createElement('div');
     overlay.className = 'readiness-overlay';
     overlay.innerHTML = `
@@ -396,7 +521,7 @@ function showLogModal() {
     document.getElementById('log-submit').addEventListener('click', async () => {
         const errEl = document.getElementById('log-error');
         try {
-            await api(`/workouts/${todayWod.workout.id}/log`, {
+            await api(`/workouts/${workout.id}/log`, {
                 method: 'POST',
                 body: JSON.stringify({
                     actual_rpe: selectedRpe,
@@ -406,8 +531,7 @@ function showLogModal() {
                 }),
             });
             overlay.remove();
-            wodLoaded = false;
-            todayWod = null;
+            allWorkouts = null;
             render();
         } catch (e) {
             errEl.textContent = e.message;
@@ -417,227 +541,12 @@ function showLogModal() {
 }
 
 // ============================================================
-// Calendar
+// Edit Log Modal
 // ============================================================
-let calendarData = null;
+function showEditLogModal(workout) {
+    const log = workout.log;
+    if (!log) return;
 
-function renderCalendarPage() {
-    let html = '<div class="page-title">This Week</div>';
-    if (!calendarData) return html + '<div class="loading">Loading calendar...</div>';
-
-    const today = new Date().toISOString().split('T')[0];
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    if (calendarData.length === 0) {
-        html += `<div class="empty">
-            <p>No workouts generated yet.</p>
-            <button class="btn btn-primary" id="gen-week-btn" style="margin-top:16px;max-width:260px;margin-left:auto;margin-right:auto">Generate This Week</button>
-        </div>`;
-        return html;
-    }
-
-    calendarData.forEach((w, idx) => {
-        const d = new Date(w.scheduled_date + 'T12:00:00');
-        const dayName = days[d.getDay()];
-        const dayNum = d.getDate();
-        const isToday = w.scheduled_date === today;
-        const classes = `cal-day${isToday ? ' today' : ''}${w.logged ? ' logged' : ''}`;
-
-        html += `<div class="${classes}" data-cal-idx="${idx}">
-            <div class="cal-date">
-                <div class="cal-date-day">${dayNum}</div>
-                <div class="cal-date-label">${dayName}</div>
-            </div>
-            <div class="cal-info">
-                <div class="cal-focus">${w.focus}</div>
-                <div class="cal-detail">RPE ${w.intensity_target_rpe} | CNS ${w.cns_load}</div>
-            </div>
-            <div class="cal-status">${w.logged ? '&#10003;' : isToday ? '&#9654;' : '&#8250;'}</div>
-        </div>`;
-    });
-
-    return html;
-}
-
-function showCalendarDetail(workout) {
-    const wj = typeof workout.workout_json === 'string' ? JSON.parse(workout.workout_json) : (workout.workout_json || {});
-    const d = new Date(workout.scheduled_date + 'T12:00:00');
-    const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const details = renderWorkoutDetails(wj);
-
-    const overlay = document.createElement('div');
-    overlay.className = 'readiness-overlay';
-    overlay.innerHTML = `
-    <div class="readiness-modal">
-        <div class="readiness-title">${workout.focus}</div>
-        <div class="history-detail-meta">
-            <span>${dateStr} — Week ${workout.program_week}, Day ${workout.day_index}</span>
-        </div>
-        <div class="history-detail-stats">
-            <span class="wod-tag tag-rpe">RPE ${workout.intensity_target_rpe}</span>
-            <span class="wod-tag tag-cns-${workout.cns_load}">CNS ${workout.cns_load}</span>
-            ${workout.logged ? '<span class="wod-tag" style="background:rgba(34,197,94,0.15);color:var(--green)">Completed</span>' : ''}
-        </div>
-        ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
-        <div class="history-detail-actions">
-            <button class="btn btn-secondary" id="cal-detail-close">Close</button>
-        </div>
-    </div>`;
-
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
-
-    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
-    document.getElementById('cal-detail-close').addEventListener('click', close);
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-}
-
-async function loadCalendar() {
-    try {
-        calendarData = await api('/workouts/calendar');
-        const app = document.getElementById('app');
-        let content = renderHeader();
-        content += renderCalendarPage();
-        content += renderNav();
-        app.innerHTML = content;
-        bindNav();
-
-        // Bind calendar item clicks
-        document.querySelectorAll('.cal-day[data-cal-idx]').forEach(el => {
-            el.addEventListener('click', () => {
-                const idx = parseInt(el.dataset.calIdx);
-                if (calendarData[idx]) showCalendarDetail(calendarData[idx]);
-            });
-        });
-
-        // Bind generate button if present
-        document.getElementById('gen-week-btn')?.addEventListener('click', async () => {
-            const btn = document.getElementById('gen-week-btn');
-            btn.disabled = true;
-            btn.textContent = 'Generating...';
-            try {
-                await api('/workouts/generate-week', { method: 'POST' });
-                calendarData = null;
-                render();
-            } catch (e) {
-                btn.textContent = 'Failed — Retry';
-                btn.disabled = false;
-            }
-        });
-    } catch {
-        calendarData = [];
-        render();
-    }
-}
-
-// ============================================================
-// History
-// ============================================================
-let historyData = null;
-
-function renderHistoryPage() {
-    let html = '<div class="page-title">History</div>';
-    if (!historyData) return html + '<div class="loading">Loading history...</div>';
-    if (historyData.length === 0) return html + '<div class="empty">No completed workouts yet.</div>';
-
-    historyData.forEach((log, idx) => {
-        const date = new Date(log.completed_at);
-        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        html += `<div class="history-item" data-history-idx="${idx}">
-            <div class="history-header">
-                <span class="history-focus">${log.focus}</span>
-                <span class="history-date">${dateStr}</span>
-            </div>
-            <div class="history-stats">
-                <span>RPE: ${log.actual_rpe}</span>
-                <span>Week ${log.program_week}, Day ${log.day_index}</span>
-                ${log.missed_reps > 0 ? `<span style="color:var(--red)">Missed: ${log.missed_reps}</span>` : ''}
-            </div>
-            ${log.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-top:6px">${log.notes}</div>` : ''}
-        </div>`;
-    });
-
-    return html;
-}
-
-function renderWorkoutDetails(wj) {
-    let details = '';
-    if (wj.primary_strength) {
-        details += renderStrengthSection('Primary Strength', wj.primary_strength);
-    }
-    if (wj.secondary_strength) {
-        details += renderStrengthSection('Secondary Strength', wj.secondary_strength);
-    }
-    if (wj.conditioning) {
-        details += `<div class="wod-section">
-            <div class="wod-section-title">${(wj.conditioning.type || 'WOD').toUpperCase()} — ${wj.conditioning.time_cap_minutes} min</div>`;
-        (wj.conditioning.movements || []).forEach(m => {
-            details += `<div class="wod-movement">
-                <span class="wod-movement-name">${formatMovement(m.movement)}</span>
-                <span class="wod-movement-detail">${m.reps ? m.reps + ' reps' : m.distance_m ? m.distance_m + 'm' : m.calories ? m.calories + ' cal' : ''}</span>
-            </div>`;
-        });
-        details += '</div>';
-    }
-    if (wj.aerobic_prescription) {
-        details += `<div class="wod-section">
-            <div class="wod-section-title">Aerobic — ${wj.aerobic_prescription.type}</div>
-            <div class="wod-movement">
-                <span class="wod-movement-name">${formatMovement(wj.aerobic_prescription.modality)}</span>
-                <span class="wod-movement-detail">${wj.aerobic_prescription.duration_minutes} min</span>
-            </div>
-        </div>`;
-    }
-    if (wj.mobility_prompt) {
-        details += `<div class="wod-section">
-            <div class="wod-section-title">Mobility</div>
-            <div class="mobility-text">${wj.mobility_prompt}</div>
-        </div>`;
-    }
-    return details;
-}
-
-function showHistoryDetail(log, logIndex) {
-    const wj = typeof log.workout_json === 'string' ? JSON.parse(log.workout_json) : (log.workout_json || {});
-    const completedDate = new Date(log.completed_at);
-    const dateStr = completedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = completedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    const details = renderWorkoutDetails(wj);
-
-    const overlay = document.createElement('div');
-    overlay.className = 'readiness-overlay';
-    overlay.innerHTML = `
-    <div class="readiness-modal">
-        <div class="readiness-title">${log.focus}</div>
-        <div class="history-detail-meta">
-            <span>Completed ${dateStr} at ${timeStr}</span>
-            <span>Week ${log.program_week}, Day ${log.day_index}</span>
-        </div>
-        <div class="history-detail-stats">
-            <span class="wod-tag tag-rpe">RPE ${log.actual_rpe}</span>
-            ${log.missed_reps > 0 ? `<span class="wod-tag" style="background:var(--red)">Missed ${log.missed_reps} reps</span>` : ''}
-        </div>
-        ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
-        ${log.notes ? `<div class="history-detail-notes">${log.notes}</div>` : ''}
-        <div class="history-detail-actions">
-            <button class="btn btn-primary" id="history-edit-btn">Edit</button>
-            <button class="btn btn-secondary" id="history-detail-close">Close</button>
-        </div>
-    </div>`;
-
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('active'));
-
-    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
-    document.getElementById('history-detail-close').addEventListener('click', close);
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-    document.getElementById('history-edit-btn').addEventListener('click', () => {
-        overlay.remove();
-        showHistoryEditModal(log, logIndex);
-    });
-}
-
-function showHistoryEditModal(log, logIndex) {
     let editRpe = log.actual_rpe;
 
     const overlay = document.createElement('div');
@@ -684,7 +593,7 @@ function showHistoryEditModal(log, logIndex) {
     document.getElementById('edit-log-save').addEventListener('click', async () => {
         const errEl = document.getElementById('edit-log-error');
         try {
-            await api(`/logs/${log.id}`, {
+            await api(`/logs/${log.log_id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
                     actual_rpe: editRpe,
@@ -693,14 +602,9 @@ function showHistoryEditModal(log, logIndex) {
                     performance_json: {},
                 }),
             });
-            // Update local data so the list reflects changes without refetching
-            if (historyData && historyData[logIndex]) {
-                historyData[logIndex].actual_rpe = editRpe;
-                historyData[logIndex].missed_reps = parseInt(document.getElementById('edit-missed').value) || 0;
-                historyData[logIndex].notes = document.getElementById('edit-notes').value || null;
-            }
             close();
-            loadHistory();
+            allWorkouts = null;
+            render();
         } catch (e) {
             errEl.textContent = e.message;
             errEl.style.display = '';
@@ -708,25 +612,55 @@ function showHistoryEditModal(log, logIndex) {
     });
 }
 
-async function loadHistory() {
-    try {
-        historyData = await api('/logs?limit=50');
-        const app = document.getElementById('app');
-        let content = renderHeader();
-        content += renderHistoryPage();
-        content += renderNav();
-        app.innerHTML = content;
-        bindNav();
-        document.querySelectorAll('.history-item[data-history-idx]').forEach(el => {
-            el.addEventListener('click', () => {
-                const idx = parseInt(el.dataset.historyIdx);
-                if (historyData[idx]) showHistoryDetail(historyData[idx], idx);
-            });
-        });
-    } catch {
-        historyData = [];
-        render();
+// ============================================================
+// Shared Workout Rendering
+// ============================================================
+function renderStrengthSection(title, block) {
+    const pct = block.load_percentage ? `${Math.round(block.load_percentage * 100)}%` : '';
+    return `<div class="wod-section">
+        <div class="wod-section-title">${title}</div>
+        <div class="wod-movement">
+            <span class="wod-movement-name">${formatMovement(block.movement)}</span>
+            <span class="wod-movement-detail">${block.scheme} @ ${pct} | Rest ${block.rest_seconds}s</span>
+        </div>
+    </div>`;
+}
+
+function renderWorkoutDetails(wj) {
+    let details = '';
+    if (wj.primary_strength) {
+        details += renderStrengthSection('Primary Strength', wj.primary_strength);
     }
+    if (wj.secondary_strength) {
+        details += renderStrengthSection('Secondary Strength', wj.secondary_strength);
+    }
+    if (wj.conditioning) {
+        details += `<div class="wod-section">
+            <div class="wod-section-title">${(wj.conditioning.type || 'WOD').toUpperCase()} — ${wj.conditioning.time_cap_minutes} min</div>`;
+        (wj.conditioning.movements || []).forEach(m => {
+            details += `<div class="wod-movement">
+                <span class="wod-movement-name">${formatMovement(m.movement)}</span>
+                <span class="wod-movement-detail">${m.reps ? m.reps + ' reps' : m.distance_m ? m.distance_m + 'm' : m.calories ? m.calories + ' cal' : ''}</span>
+            </div>`;
+        });
+        details += '</div>';
+    }
+    if (wj.aerobic_prescription) {
+        details += `<div class="wod-section">
+            <div class="wod-section-title">Aerobic — ${wj.aerobic_prescription.type}</div>
+            <div class="wod-movement">
+                <span class="wod-movement-name">${formatMovement(wj.aerobic_prescription.modality)}</span>
+                <span class="wod-movement-detail">${wj.aerobic_prescription.duration_minutes} min</span>
+            </div>
+        </div>`;
+    }
+    if (wj.mobility_prompt) {
+        details += `<div class="wod-section">
+            <div class="wod-section-title">Mobility</div>
+            <div class="mobility-text">${wj.mobility_prompt}</div>
+        </div>`;
+    }
+    return details;
 }
 
 // ============================================================
@@ -776,7 +710,6 @@ async function showSettingsModal() {
     document.body.appendChild(overlay);
     document.getElementById('settings-close').addEventListener('click', () => overlay.remove());
 
-    // Load available providers
     try {
         const data = await api('/settings/llm');
         const listEl = document.getElementById('llm-list');
@@ -796,7 +729,6 @@ async function showSettingsModal() {
                 const providerId = el.dataset.provider;
                 const statusEl = document.getElementById('llm-status');
 
-                // Disable all options while testing
                 listEl.querySelectorAll('.llm-option').forEach(o => o.style.pointerEvents = 'none');
                 statusEl.style.display = '';
                 statusEl.style.color = 'var(--text-dim)';
@@ -807,7 +739,6 @@ async function showSettingsModal() {
                     if (result.ok) {
                         statusEl.style.color = 'var(--green)';
                         statusEl.textContent = `AI ${result.name} Enabled`;
-                        // Update active state
                         listEl.querySelectorAll('.llm-option').forEach(o => {
                             o.classList.remove('active');
                             o.querySelector('.llm-option-check').textContent = '';
@@ -870,10 +801,6 @@ function formatMovement(name) {
 // Boot
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-    wodLoaded = false;
-    todayWod = null;
-    calendarData = null;
-    historyData = null;
-
+    allWorkouts = null;
     render();
 });
