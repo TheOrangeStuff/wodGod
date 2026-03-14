@@ -6,31 +6,31 @@ services:
     container_name: wodgod-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: wodgod
-      POSTGRES_USER: wodgod
+      POSTGRES_DB: ${POSTGRES_DB:-wodgod}
+      POSTGRES_USER: ${POSTGRES_USER:-wodgod}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wodgod_dev}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh
-      - ./db/migrations:/docker-entrypoint-initdb.d/sql/migrations
-      - ./db/functions:/docker-entrypoint-initdb.d/sql/functions
-      - ./db/seeds:/docker-entrypoint-initdb.d/sql/seeds
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wodgod"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wodgod}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: wodgod-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://wodgod:${POSTGRES_PASSWORD:-wodgod_dev}@db:5432/wodgod
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-wodgod}
+      POSTGRES_USER: ${POSTGRES_USER:-wodgod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wodgod_dev}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
       LLM_MODEL: ${LLM_MODEL:-llama3}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}

@@ -1,17 +1,37 @@
 """wodGod — CrossFit Training Engine API."""
 
+import logging
 import os
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api import auth, workouts, logs, programs
+from app.core.bootstrap import bootstrap_database
+from app.core.migrate import run_migrations
+
+logger = logging.getLogger("wodgod")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Bootstrap database and run migrations on startup."""
+    logger.info("Bootstrapping database...")
+    bootstrap_database()
+    logger.info("Running database migrations...")
+    run_migrations()
+    logger.info("Migrations complete.")
+    yield
+
 
 app = FastAPI(
     title="wodGod",
     description="Stateful CrossFit programming engine with LLM-driven workout generation",
     version="0.2.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

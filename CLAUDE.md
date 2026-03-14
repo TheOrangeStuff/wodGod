@@ -17,7 +17,7 @@ wodGod is a stateful CrossFit programming engine for up to 10 athletes. It gener
 
 ## Quick Start
 
-The Postgres database is provided externally (not managed by docker compose). Ensure it is running and reachable before starting the backend.
+The Postgres database is provided externally (not managed by docker compose). Ensure it is running and reachable before starting the backend. Database migrations are applied automatically on backend startup — no manual `psql` steps needed.
 
 ```bash
 cp .env.example .env
@@ -124,3 +124,21 @@ See `.env.example` for all configuration. Key variables:
 - `LLM_BASE_URL` — LLM server endpoint
 - `LLM_MODEL` — Model name (e.g., `llama3`)
 - `DATABASE_URL` — Full connection string pointing to the externally-provided Postgres instance
+
+## Development Status (as of 2026-03-12)
+
+### Infrastructure Setup
+- [x] `.env` configured with DATABASE_URL pointing to external Postgres instance
+- [x] PostgreSQL connection verified (Python `psycopg2` connect test returned "connected!")
+- [x] Backend started via `docker compose up -d backend` (both `db` and `backend` services running)
+- [x] Auto-migration added — backend now applies all SQL migrations on startup via `schema_migrations` tracking table. Rebuild backend to pick up: `docker compose up -d --build backend`
+- [ ] LLM provider configured and reachable
+
+### User Testing
+- [ ] Login to the app (demo/demo or new account) — rebuild backend first to trigger auto-migration
+- [ ] Set up athlete profile
+- [ ] Generate a workout
+- [ ] Log a completed workout
+- [ ] Test calendar/history views
+- [ ] Test readiness check-in flow
+- [ ] End-to-end: generate a full week of programming
