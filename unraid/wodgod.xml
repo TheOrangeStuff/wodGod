@@ -45,4 +45,9 @@
   <Config Name="LLM Model" Target="LLM_MODEL" Default="llama3" Mode="" Description="Model name to use for workout generation (e.g. llama3, mistral, etc.)" Type="Variable" Display="always" Required="true" Mask="false">llama3</Config>
 
   <Config Name="LLM API Key" Target="LLM_API_KEY" Default="" Mode="" Description="API key for OpenAI-compatible providers. Leave blank for Ollama." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+
+  <!-- Claude (Anthropic) API -->
+  <Config Name="Claude API Key" Target="CLAUDE_API_KEY" Default="" Mode="" Description="Anthropic API key for Claude. Leave blank to disable Claude as an option. Get one at https://console.anthropic.com/" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+
+  <Config Name="Claude Model" Target="CLAUDE_MODEL" Default="claude-sonnet-4-20250514" Mode="" Description="Claude model to use (e.g. claude-sonnet-4-20250514, claude-haiku-4-5-20251001)." Type="Variable" Display="advanced" Required="false" Mask="false">claude-sonnet-4-20250514</Config>
 </Container>

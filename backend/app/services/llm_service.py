@@ -69,8 +69,11 @@ async def generate_workout(system_state: dict) -> str:
         system_state=json.dumps(system_state, indent=2, default=str)
     )
 
-    if settings.LLM_PROVIDER == "ollama":
+    provider = settings.active_llm
+    if provider == "ollama":
         return await _call_ollama(user_prompt)
+    elif provider == "claude":
+        return await _call_claude(user_prompt)
     else:
         return await _call_openai_compatible(user_prompt)
 
@@ -97,6 +100,31 @@ async def _call_ollama(user_prompt: str) -> str:
         resp.raise_for_status()
         data = resp.json()
         return data["message"]["content"]
+
+
+async def _call_claude(user_prompt: str) -> str:
+    """Call Claude (Anthropic) API."""
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": settings.CLAUDE_API_KEY,
+        "anthropic-version": "2023-06-01",
+    }
+    payload = {
+        "model": settings.CLAUDE_MODEL,
+        "max_tokens": 2048,
+        "system": SYSTEM_PROMPT,
+        "messages": [
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.4,
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["content"][0]["text"]
 
 
 async def _call_openai_compatible(user_prompt: str) -> str:

@@ -34,6 +34,8 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
       LLM_MODEL: ${LLM_MODEL:-llama3}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-20250514}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-72}
     ports:
