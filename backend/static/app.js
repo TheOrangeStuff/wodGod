@@ -402,7 +402,6 @@ async function loadWod() {
 
         // Bind log button
         document.getElementById('start-wod-btn')?.addEventListener('click', () => showLogModal());
-        bindUserMenu();
     } catch (e) {
         wodLoaded = true;
         todayWod = null;
@@ -529,7 +528,6 @@ async function loadCalendar() {
         content += renderNav();
         app.innerHTML = content;
         bindNav();
-        bindUserMenu();
 
         // Bind generate button if present
         document.getElementById('gen-week-btn')?.addEventListener('click', async () => {
@@ -590,7 +588,6 @@ async function loadHistory() {
         content += renderNav();
         app.innerHTML = content;
         bindNav();
-        bindUserMenu();
     } catch {
         historyData = [];
         render();
