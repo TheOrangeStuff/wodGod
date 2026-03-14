@@ -231,37 +231,6 @@ function bindNav() {
             render();
         });
     });
-    bindUserMenu();
-}
-
-function bindUserMenu() {
-    const menuBtn = document.getElementById('user-menu-btn');
-    const dropdown = document.getElementById('user-dropdown');
-    if (!menuBtn || !dropdown) return;
-
-    menuBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.toggle('open');
-    });
-
-    dropdown.addEventListener('click', (e) => {
-        e.stopPropagation();
-    });
-
-    document.getElementById('menu-profile')?.addEventListener('click', () => {
-        dropdown.classList.remove('open');
-        // Profile — not yet implemented
-    });
-
-    document.getElementById('menu-settings')?.addEventListener('click', () => {
-        dropdown.classList.remove('open');
-        // Settings — not yet implemented
-    });
-
-    document.getElementById('menu-logout')?.addEventListener('click', () => {
-        dropdown.classList.remove('open');
-        showLogoutConfirm();
-    });
 }
 
 function showLogoutConfirm() {
@@ -611,9 +580,33 @@ document.addEventListener('DOMContentLoaded', () => {
     calendarData = null;
     historyData = null;
 
-    // Single global listener to close user dropdown on outside click
-    document.addEventListener('click', () => {
-        document.getElementById('user-dropdown')?.classList.remove('open');
+    // Global delegated click handler for user menu
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('user-dropdown');
+        const menuBtn = document.getElementById('user-menu-btn');
+
+        // Click on the username toggle
+        if (menuBtn && (e.target === menuBtn || menuBtn.contains(e.target))) {
+            if (dropdown) dropdown.classList.toggle('open');
+            return;
+        }
+
+        // Click inside the dropdown
+        if (dropdown && dropdown.contains(e.target)) {
+            const item = e.target.closest('.user-dropdown-item');
+            if (!item) return;
+
+            dropdown.classList.remove('open');
+
+            if (item.id === 'menu-logout') {
+                showLogoutConfirm();
+            }
+            // menu-profile and menu-settings: no-op for now
+            return;
+        }
+
+        // Click anywhere else — close dropdown
+        if (dropdown) dropdown.classList.remove('open');
     });
 
     render();
