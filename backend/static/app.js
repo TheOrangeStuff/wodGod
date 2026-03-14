@@ -244,10 +244,6 @@ function bindUserMenu() {
         dropdown.classList.toggle('open');
     });
 
-    document.addEventListener('click', () => {
-        dropdown.classList.remove('open');
-    });
-
     dropdown.addEventListener('click', (e) => {
         e.stopPropagation();
     });
@@ -617,5 +613,11 @@ document.addEventListener('DOMContentLoaded', () => {
     todayWod = null;
     calendarData = null;
     historyData = null;
+
+    // Single global listener to close user dropdown on outside click
+    document.addEventListener('click', () => {
+        document.getElementById('user-dropdown')?.classList.remove('open');
+    });
+
     render();
 });
