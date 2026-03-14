@@ -16,6 +16,18 @@ from app.models.auth import RegisterInput, LoginInput, ProfileSetupInput, Profil
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _has_column(cur, column_name: str) -> bool:
+    """Check if a column exists on the users table."""
+    cur.execute(
+        """SELECT EXISTS(
+               SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'users' AND column_name = %s
+           )""",
+        (column_name,),
+    )
+    return cur.fetchone()[0]
+
+
 @router.post("/register")
 def register(data: RegisterInput):
     """Register a new athlete account."""
@@ -71,25 +83,35 @@ def setup_profile(
     """Complete first-time athlete profile setup."""
     with get_db() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """UPDATE users SET
-                       name = %s, age = %s, weight_kg = %s, height_cm = %s,
-                       sex = %s, training_age_yr = %s, equipment = %s,
-                       unit_system = %s, profile_complete = true
-                   WHERE id = %s
-                   RETURNING id""",
-                (
-                    data.name,
-                    data.age,
-                    data.weight_kg,
-                    data.height_cm,
-                    data.sex,
-                    data.training_age_yr,
-                    json.dumps(data.equipment),
-                    data.unit_system,
-                    user_id,
-                ),
-            )
+            has_units = _has_column(cur, "unit_system")
+            if has_units:
+                cur.execute(
+                    """UPDATE users SET
+                           name = %s, age = %s, weight_kg = %s, height_cm = %s,
+                           sex = %s, training_age_yr = %s, equipment = %s,
+                           unit_system = %s, profile_complete = true
+                       WHERE id = %s
+                       RETURNING id""",
+                    (
+                        data.name, data.age, data.weight_kg, data.height_cm,
+                        data.sex, data.training_age_yr,
+                        json.dumps(data.equipment), data.unit_system, user_id,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """UPDATE users SET
+                           name = %s, age = %s, weight_kg = %s, height_cm = %s,
+                           sex = %s, training_age_yr = %s, equipment = %s,
+                           profile_complete = true
+                       WHERE id = %s
+                       RETURNING id""",
+                    (
+                        data.name, data.age, data.weight_kg, data.height_cm,
+                        data.sex, data.training_age_yr,
+                        json.dumps(data.equipment), user_id,
+                    ),
+                )
             row = cur.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="User not found")
@@ -134,18 +156,21 @@ def update_profile(
                     raise HTTPException(status_code=409, detail="Username already taken")
 
             # Build dynamic SET clause for non-None fields
+            has_units = _has_column(cur, "unit_system")
             updates = []
             params = []
-            for field, column in [
+            field_map = [
                 ("name", "name"),
                 ("age", "age"),
                 ("weight_kg", "weight_kg"),
                 ("height_cm", "height_cm"),
                 ("sex", "sex"),
                 ("training_age_yr", "training_age_yr"),
-                ("unit_system", "unit_system"),
                 ("username", "username"),
-            ]:
+            ]
+            if has_units:
+                field_map.append(("unit_system", "unit_system"))
+            for field, column in field_map:
                 val = getattr(data, field)
                 if val is not None:
                     updates.append(f"{column} = %s")

@@ -60,14 +60,36 @@ def get_current_user(
     """FastAPI dependency: return full user row."""
     with get_db() as conn:
         with conn.cursor() as cur:
+            # Check if unit_system column exists (handles pre-migration DB)
             cur.execute(
-                """SELECT id, username, name, age, weight_kg, height_cm,
-                          sex, training_age_yr, equipment, unit_system,
-                          profile_complete
-                   FROM users WHERE id = %s""",
-                (user_id,),
+                """SELECT EXISTS(
+                       SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'users' AND column_name = 'unit_system'
+                   )"""
             )
+            has_unit_system = cur.fetchone()[0]
+
+            if has_unit_system:
+                cur.execute(
+                    """SELECT id, username, name, age, weight_kg, height_cm,
+                              sex, training_age_yr, equipment, unit_system,
+                              profile_complete
+                       FROM users WHERE id = %s""",
+                    (user_id,),
+                )
+            else:
+                cur.execute(
+                    """SELECT id, username, name, age, weight_kg, height_cm,
+                              sex, training_age_yr, equipment,
+                              profile_complete
+                       FROM users WHERE id = %s""",
+                    (user_id,),
+                )
+
             row = cur.fetchone()
             if not row:
                 raise HTTPException(status_code=401, detail="User not found")
-            return dict(row)
+            result = dict(row)
+            if not has_unit_system:
+                result["unit_system"] = "metric"
+            return result
