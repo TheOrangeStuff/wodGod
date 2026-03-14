@@ -1,129 +1,7 @@
 -- ============================================================
--- SYSTEM STATE JSON GENERATION
--- All trend computation and state assembly in SQL
+-- Enhanced system state: richer LLM context
+-- Adds recent prescriptions, load history, extended windows
 -- ============================================================
-
--- ============================================================
--- Rolling 7-day average RPE
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_rolling_rpe(p_user_id UUID, p_days INTEGER DEFAULT 7)
-RETURNS NUMERIC AS $$
-    SELECT COALESCE(ROUND(AVG(wl.actual_rpe), 1), 0)
-    FROM workout_logs wl
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - (p_days || ' days')::interval;
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- Missed reps in last 7 days
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_missed_reps_7d(p_user_id UUID)
-RETURNS INTEGER AS $$
-    SELECT COALESCE(SUM(wl.missed_reps), 0)::integer
-    FROM workout_logs wl
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days';
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- CNS load exposure (last 7 days)
--- Returns counts of low/moderate/high CNS sessions
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_cns_exposure_7d(p_user_id UUID)
-RETURNS JSONB AS $$
-    SELECT jsonb_build_object(
-        'low',      COALESCE(SUM(CASE WHEN w.cns_load = 'low' THEN 1 ELSE 0 END), 0),
-        'moderate',  COALESCE(SUM(CASE WHEN w.cns_load = 'moderate' THEN 1 ELSE 0 END), 0),
-        'high',     COALESCE(SUM(CASE WHEN w.cns_load = 'high' THEN 1 ELSE 0 END), 0)
-    )
-    FROM workout_logs wl
-    JOIN workouts w ON w.id = wl.workout_id
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days';
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- Sessions completed in last 7 days
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_sessions_completed_7d(p_user_id UUID)
-RETURNS INTEGER AS $$
-    SELECT COUNT(*)::integer
-    FROM workout_logs wl
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days';
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- Zone 2 aerobic minutes in last 7 days
--- Reads from performance_json -> aerobic -> duration_minutes
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_zone2_minutes_7d(p_user_id UUID)
-RETURNS INTEGER AS $$
-    SELECT COALESCE(
-        SUM(
-            CASE
-                WHEN (wl.performance_json -> 'aerobic' ->> 'completed')::boolean = true
-                THEN (wl.performance_json -> 'aerobic' ->> 'duration_minutes')::integer
-                ELSE 0
-            END
-        ), 0
-    )::integer
-    FROM workout_logs wl
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days';
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- Movement category balance (last 7 days)
--- Returns how many sets hit each movement category
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_movement_balance_7d(p_user_id UUID)
-RETURNS JSONB AS $$
-WITH workout_movements AS (
-    -- Extract primary strength movement
-    SELECT
-        wl.user_id,
-        w.workout_json -> 'primary_strength' ->> 'movement' AS movement_name
-    FROM workout_logs wl
-    JOIN workouts w ON w.id = wl.workout_id
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days'
-
-    UNION ALL
-
-    -- Extract secondary strength movement
-    SELECT
-        wl.user_id,
-        w.workout_json -> 'secondary_strength' ->> 'movement' AS movement_name
-    FROM workout_logs wl
-    JOIN workouts w ON w.id = wl.workout_id
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days'
-
-    UNION ALL
-
-    -- Extract conditioning movements
-    SELECT
-        wl.user_id,
-        cond_mov ->> 'movement' AS movement_name
-    FROM workout_logs wl
-    JOIN workouts w ON w.id = wl.workout_id,
-    jsonb_array_elements(w.workout_json -> 'conditioning' -> 'movements') AS cond_mov
-    WHERE wl.user_id = p_user_id
-      AND wl.completed_at >= now() - interval '7 days'
-),
-category_counts AS (
-    SELECT m.category::text AS cat, COUNT(*) AS cnt
-    FROM workout_movements wm
-    JOIN movements m ON m.name = wm.movement_name
-    GROUP BY m.category
-)
-SELECT COALESCE(
-    jsonb_object_agg(cat, cnt),
-    '{}'::jsonb
-)
-FROM category_counts;
-$$ LANGUAGE sql STABLE;
 
 -- ============================================================
 -- Movement category balance (last 21 days) — mesocycle window
@@ -162,7 +40,7 @@ $$ LANGUAGE sql STABLE;
 
 -- ============================================================
 -- Recent workout prescriptions (last 14 days)
--- Returns full workout_json + log data for recent completed workouts
+-- Returns full workout_json + log data for recent sessions
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_recent_prescriptions(p_user_id UUID)
 RETURNS JSONB AS $$
@@ -187,7 +65,7 @@ $$ LANGUAGE sql STABLE;
 
 -- ============================================================
 -- Per-movement load history (last 21 days)
--- Returns last few sessions' load percentages per strength movement
+-- Returns last 4 sessions' load percentages per strength movement
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_movement_load_history(p_user_id UUID)
 RETURNS JSONB AS $$
@@ -203,9 +81,7 @@ WITH strength_sessions AS (
     WHERE wl.user_id = p_user_id
       AND wl.completed_at >= now() - interval '21 days'
       AND w.workout_json -> 'primary_strength' ->> 'movement' IS NOT NULL
-
     UNION ALL
-
     SELECT
         w.workout_json -> 'secondary_strength' ->> 'movement',
         (w.workout_json -> 'secondary_strength' ->> 'load_percentage')::numeric,
@@ -234,13 +110,10 @@ per_movement AS (
             ) ORDER BY session_date DESC
         ) AS sessions
     FROM ranked
-    WHERE rn <= 4  -- last 4 sessions per movement
+    WHERE rn <= 4
     GROUP BY movement
 )
-SELECT COALESCE(
-    jsonb_object_agg(movement, sessions),
-    '{}'::jsonb
-)
+SELECT COALESCE(jsonb_object_agg(movement, sessions), '{}'::jsonb)
 FROM per_movement;
 $$ LANGUAGE sql STABLE;
 
@@ -260,36 +133,7 @@ RETURNS JSONB AS $$
 $$ LANGUAGE sql STABLE;
 
 -- ============================================================
--- Average readiness (last 3 days)
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_avg_readiness_3d(p_user_id UUID)
-RETURNS NUMERIC AS $$
-    SELECT COALESCE(ROUND(AVG(readiness_score), 1), 3.0)
-    FROM daily_readiness
-    WHERE user_id = p_user_id
-      AND date >= CURRENT_DATE - 2;
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- Latest readiness entry
--- ============================================================
-CREATE OR REPLACE FUNCTION fn_latest_readiness(p_user_id UUID)
-RETURNS JSONB AS $$
-    SELECT jsonb_build_object(
-        'date', date,
-        'readiness_score', readiness_score,
-        'sleep_quality', sleep_quality,
-        'soreness', soreness,
-        'stress', stress
-    )
-    FROM daily_readiness
-    WHERE user_id = p_user_id
-    ORDER BY date DESC
-    LIMIT 1;
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
--- MAIN: Assemble full SYSTEM_STATE JSON
+-- Update fn_build_system_state with new context fields
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_build_system_state(p_user_id UUID)
 RETURNS JSONB AS $$
@@ -298,13 +142,11 @@ DECLARE
     v_user RECORD;
     v_result JSONB;
 BEGIN
-    -- Fetch user
     SELECT * INTO v_user FROM users WHERE id = p_user_id;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'User not found: %', p_user_id;
     END IF;
 
-    -- Fetch active program
     SELECT * INTO v_program FROM programs
     WHERE user_id = p_user_id AND is_active = true
     ORDER BY created_at DESC LIMIT 1;
