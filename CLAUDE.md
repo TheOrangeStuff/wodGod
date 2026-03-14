@@ -123,21 +123,26 @@ See `.env.example` for all configuration. Key variables:
 - `LLM_PROVIDER` — `ollama` or `openai_compatible`
 - `LLM_BASE_URL` — LLM server endpoint
 - `LLM_MODEL` — Model name (e.g., `llama3`)
-- `DATABASE_URL` — Full connection string pointing to the externally-provided Postgres instance
+- `DATABASE_URL` — Full connection string (or use individual `POSTGRES_*` vars below)
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` — Individual credentials; used to auto-build `DATABASE_URL` and to bootstrap the database if it doesn't exist
 
-## Development Status (as of 2026-03-12)
+## Development Status (as of 2026-03-14)
 
 ### Infrastructure Setup
-- [x] `.env` configured with DATABASE_URL pointing to external Postgres instance
-- [x] PostgreSQL connection verified (Python `psycopg2` connect test returned "connected!")
-- [x] Backend started via `docker compose up -d backend` (both `db` and `backend` services running)
-- [x] Auto-migration added — backend now applies all SQL migrations on startup via `schema_migrations` tracking table. Rebuild backend to pick up: `docker compose up -d --build backend`
+- [x] `.env` configured — supports both `DATABASE_URL` and individual `POSTGRES_*` env vars
+- [x] PostgreSQL connection verified
+- [x] Backend runs via `docker compose up -d backend`
+- [x] Auto-migration on startup via `schema_migrations` tracking table (`backend/app/core/migrate.py`)
+- [x] Auto-creates `wodgod_db` database if it doesn't exist (bootstraps from individual Postgres credentials)
+- [x] Migration runner handles pre-existing databases gracefully (no crash on re-run)
+- [x] User registration fixed (CHECK constraint conflict on profile fields resolved)
 - [ ] LLM provider configured and reachable
 
 ### User Testing
-- [ ] Login to the app (demo/demo or new account) — rebuild backend first to trigger auto-migration
+- [x] Login to the app (demo/demo or new account)
+- [x] Register a new account
 - [ ] Set up athlete profile
-- [ ] Generate a workout
+- [ ] Generate a workout (requires LLM provider)
 - [ ] Log a completed workout
 - [ ] Test calendar/history views
 - [ ] Test readiness check-in flow
