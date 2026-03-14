@@ -14,9 +14,12 @@ RULES:
 4. You MUST respect CNS load limits.
 5. You MUST include an aerobic prescription of at least 10 minutes.
 6. Load percentages are relative to the athlete's training max for that movement.
-7. Select movements to balance categories that are underrepresented in movement_balance_last_7_days.
-8. Consider fatigue_state when choosing intensity and volume.
+7. Select movements to balance categories that are underrepresented in movement_balance_last_7_days. Use movement_balance_last_21_days for mesocycle-level balance.
+8. Consider fatigue_state when choosing intensity and volume. Use 21-day trends to detect accumulated fatigue or staleness.
 9. If readiness is low (<=2), reduce intensity and volume.
+10. Review recent_prescriptions to see the full workout details from the last 14 days. Do NOT repeat the same movement/scheme/load combination from the last 2-3 sessions. Vary stimulus by changing movements, rep schemes, or load percentages.
+11. Use movement_load_history to intelligently progress loading. If the athlete completed a movement at a given load with RPE < 8, progress load by 2-5%. If RPE was high (>=9) or reps were missed, maintain or reduce load.
+12. Avoid programming the same primary strength movement more than twice per week unless the phase specifically calls for it.
 
 REQUIRED OUTPUT SCHEMA:
 {
