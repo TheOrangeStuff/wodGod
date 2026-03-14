@@ -11,7 +11,7 @@ from app.core.auth import (
     get_current_user_id,
     get_current_user,
 )
-from app.models.auth import RegisterInput, LoginInput, ProfileSetupInput
+from app.models.auth import RegisterInput, LoginInput, ProfileSetupInput, ProfileUpdateInput
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -75,7 +75,7 @@ def setup_profile(
                 """UPDATE users SET
                        name = %s, age = %s, weight_kg = %s, height_cm = %s,
                        sex = %s, training_age_yr = %s, equipment = %s,
-                       profile_complete = true
+                       unit_system = %s, profile_complete = true
                    WHERE id = %s
                    RETURNING id""",
                 (
@@ -86,6 +86,7 @@ def setup_profile(
                     data.sex,
                     data.training_age_yr,
                     json.dumps(data.equipment),
+                    data.unit_system,
                     user_id,
                 ),
             )
@@ -113,6 +114,61 @@ def setup_profile(
         "profile_complete": True,
         "program_created": program is not None,
     }
+
+
+@router.put("/profile")
+def update_profile(
+    data: ProfileUpdateInput,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Update user profile fields. Only provided fields are changed."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            # Handle username change — check uniqueness
+            if data.username is not None:
+                cur.execute(
+                    "SELECT id FROM users WHERE username = %s AND id != %s",
+                    (data.username, user_id),
+                )
+                if cur.fetchone():
+                    raise HTTPException(status_code=409, detail="Username already taken")
+
+            # Build dynamic SET clause for non-None fields
+            updates = []
+            params = []
+            for field, column in [
+                ("name", "name"),
+                ("age", "age"),
+                ("weight_kg", "weight_kg"),
+                ("height_cm", "height_cm"),
+                ("sex", "sex"),
+                ("training_age_yr", "training_age_yr"),
+                ("unit_system", "unit_system"),
+                ("username", "username"),
+            ]:
+                val = getattr(data, field)
+                if val is not None:
+                    updates.append(f"{column} = %s")
+                    params.append(val)
+
+            # Handle password separately (needs hashing)
+            if data.password is not None:
+                updates.append("password_hash = %s")
+                params.append(hash_password(data.password))
+
+            if not updates:
+                raise HTTPException(status_code=422, detail="No fields to update")
+
+            params.append(user_id)
+            cur.execute(
+                f"""UPDATE users SET {', '.join(updates)}
+                    WHERE id = %s RETURNING id""",
+                params,
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail="User not found")
+
+    return {"updated": True}
 
 
 @router.get("/me")
