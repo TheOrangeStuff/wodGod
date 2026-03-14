@@ -436,14 +436,14 @@ function renderCalendarPage() {
         return html;
     }
 
-    calendarData.forEach(w => {
+    calendarData.forEach((w, idx) => {
         const d = new Date(w.scheduled_date + 'T12:00:00');
         const dayName = days[d.getDay()];
         const dayNum = d.getDate();
         const isToday = w.scheduled_date === today;
         const classes = `cal-day${isToday ? ' today' : ''}${w.logged ? ' logged' : ''}`;
 
-        html += `<div class="${classes}">
+        html += `<div class="${classes}" data-cal-idx="${idx}">
             <div class="cal-date">
                 <div class="cal-date-day">${dayNum}</div>
                 <div class="cal-date-label">${dayName}</div>
@@ -452,11 +452,44 @@ function renderCalendarPage() {
                 <div class="cal-focus">${w.focus}</div>
                 <div class="cal-detail">RPE ${w.intensity_target_rpe} | CNS ${w.cns_load}</div>
             </div>
-            <div class="cal-status">${w.logged ? '&#10003;' : isToday ? '&#9654;' : ''}</div>
+            <div class="cal-status">${w.logged ? '&#10003;' : isToday ? '&#9654;' : '&#8250;'}</div>
         </div>`;
     });
 
     return html;
+}
+
+function showCalendarDetail(workout) {
+    const wj = typeof workout.workout_json === 'string' ? JSON.parse(workout.workout_json) : (workout.workout_json || {});
+    const d = new Date(workout.scheduled_date + 'T12:00:00');
+    const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const details = renderWorkoutDetails(wj);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">${workout.focus}</div>
+        <div class="history-detail-meta">
+            <span>${dateStr} — Week ${workout.program_week}, Day ${workout.day_index}</span>
+        </div>
+        <div class="history-detail-stats">
+            <span class="wod-tag tag-rpe">RPE ${workout.intensity_target_rpe}</span>
+            <span class="wod-tag tag-cns-${workout.cns_load}">CNS ${workout.cns_load}</span>
+            ${workout.logged ? '<span class="wod-tag" style="background:rgba(34,197,94,0.15);color:var(--green)">Completed</span>' : ''}
+        </div>
+        ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
+        <div class="history-detail-actions">
+            <button class="btn btn-secondary" id="cal-detail-close">Close</button>
+        </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+    document.getElementById('cal-detail-close').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 }
 
 async function loadCalendar() {
@@ -468,6 +501,14 @@ async function loadCalendar() {
         content += renderNav();
         app.innerHTML = content;
         bindNav();
+
+        // Bind calendar item clicks
+        document.querySelectorAll('.cal-day[data-cal-idx]').forEach(el => {
+            el.addEventListener('click', () => {
+                const idx = parseInt(el.dataset.calIdx);
+                if (calendarData[idx]) showCalendarDetail(calendarData[idx]);
+            });
+        });
 
         // Bind generate button if present
         document.getElementById('gen-week-btn')?.addEventListener('click', async () => {
