@@ -406,6 +406,41 @@ body {
     color: var(--text-dim);
 }
 
+.history-item[data-history-idx] {
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.history-item[data-history-idx]:active {
+    border-color: var(--accent);
+}
+
+.history-detail-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.history-detail-stats {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.history-detail-notes {
+    font-size: 13px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    margin-top: 12px;
+    font-style: italic;
+}
+
 /* Auth screens */
 .auth-container {
     display: flex;

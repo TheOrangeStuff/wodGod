@@ -33,7 +33,7 @@ class Settings:
 
     # Claude API (Anthropic)
     CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
-    CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+    CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 
     # Active LLM selection (runtime-switchable, defaults to LLM_PROVIDER)
     active_llm: str = os.getenv("LLM_PROVIDER", "ollama")
