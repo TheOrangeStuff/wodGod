@@ -13,6 +13,7 @@ logger = logging.getLogger("wodgod.migrate")
 MIGRATION_FILES = [
     "migrations/001_schema.sql",
     "migrations/002_auth_multiuser.sql",
+    "migrations/003_fix_registration_defaults.sql",
     "functions/001_system_state.sql",
     "seeds/001_seed_data.sql",
 ]

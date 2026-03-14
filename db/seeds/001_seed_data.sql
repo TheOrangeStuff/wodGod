@@ -4,12 +4,12 @@
 -- ============================================================
 -- SEED USER
 -- ============================================================
--- password is 'demo' hashed with pgcrypto crypt/bf
+-- password is 'demo' hashed with bcrypt (passlib-compatible $2b$ format)
 INSERT INTO users (id, username, password_hash, name, age, weight_kg, height_cm, sex, training_age_yr, equipment, profile_complete)
 VALUES (
     '11111111-1111-1111-1111-111111111111',
     'demo',
-    crypt('demo', gen_salt('bf')),
+    '$2b$12$alQhzdRYeEru5Xmxhyx03uRv8J0eXaZ5Z2uwRV/Hbba.qC/.a18ry',
     'Demo Athlete',
     32,
     88.5,
