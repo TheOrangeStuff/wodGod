@@ -100,6 +100,26 @@ def update_log(
             }
 
 
+@router.delete("/workouts/{workout_id}/log")
+def delete_log(
+    workout_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Delete a workout log (marks workout as MISSED)."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """DELETE FROM workout_logs
+                   WHERE workout_id = %s AND user_id = %s
+                   RETURNING id""",
+                (workout_id, user_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Log not found")
+            return {"deleted": True}
+
+
 @router.get("/logs")
 def list_logs(limit: int = 20, user_id: str = Depends(get_current_user_id)):
     """List recent workout logs."""

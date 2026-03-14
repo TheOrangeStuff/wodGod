@@ -181,6 +181,54 @@ def get_calendar(user_id: str = Depends(get_current_user_id)):
             return workouts
 
 
+@router.get("/all")
+def get_all_workouts(user_id: str = Depends(get_current_user_id)):
+    """Get all workouts with status labels: TODAY, COMPLETE, MISSED, UPCOMING."""
+    from datetime import date as date_type
+
+    today = date_type.today()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT w.id, w.program_week, w.day_index, w.focus,
+                          w.intensity_target_rpe, w.cns_load, w.workout_json,
+                          w.scheduled_date
+                   FROM workouts w
+                   JOIN programs p ON p.id = w.program_id
+                   WHERE p.user_id = %s AND p.is_active = true
+                   ORDER BY w.scheduled_date DESC, w.day_index""",
+                (user_id,),
+            )
+            workouts = [dict(r) for r in cur.fetchall()]
+
+            # Get logged workout IDs
+            workout_ids = [w["id"] for w in workouts]
+            logged_map = {}
+            if workout_ids:
+                cur.execute(
+                    """SELECT wl.workout_id, wl.id as log_id, wl.actual_rpe,
+                              wl.missed_reps, wl.completed_at, wl.notes
+                       FROM workout_logs wl
+                       WHERE wl.user_id = %s AND wl.workout_id = ANY(%s)""",
+                    (user_id, workout_ids),
+                )
+                for r in cur.fetchall():
+                    logged_map[r["workout_id"]] = dict(r)
+
+            for w in workouts:
+                sd = w["scheduled_date"]
+                has_log = w["id"] in logged_map
+                if sd == today:
+                    w["status"] = "COMPLETE" if has_log else "TODAY"
+                elif sd < today:
+                    w["status"] = "COMPLETE" if has_log else "MISSED"
+                else:
+                    w["status"] = "UPCOMING"
+                w["log"] = logged_map.get(w["id"])
+
+            return workouts
+
+
 @router.get("/{workout_id}")
 def get_workout(workout_id: str, user_id: str = Depends(get_current_user_id)):
     """Retrieve a stored workout by ID."""
