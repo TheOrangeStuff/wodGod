@@ -49,6 +49,7 @@ function render() {
     if (currentView === 'wod') content += renderWodPage();
     else if (currentView === 'calendar') content += renderCalendarPage();
     else if (currentView === 'history') content += renderHistoryPage();
+    else if (currentView === 'profile') content += renderProfilePage();
     content += renderNav();
 
     app.innerHTML = content;
@@ -56,6 +57,7 @@ function render() {
     if (currentView === 'wod') loadWod();
     else if (currentView === 'calendar') loadCalendar();
     else if (currentView === 'history') loadHistory();
+    else if (currentView === 'profile') bindProfile();
 }
 
 // ============================================================
@@ -197,15 +199,6 @@ function renderHeader() {
     return `
     <div class="header">
         <h1>wod<span>God</span></h1>
-        <div class="user-menu-wrapper">
-            <div class="header-user" id="user-menu-btn">${currentUser?.name || currentUser?.username} &#x25BE;</div>
-            <div class="user-dropdown" id="user-dropdown">
-                <div class="user-dropdown-item" id="menu-profile">Profile</div>
-                <div class="user-dropdown-item" id="menu-settings">Settings</div>
-                <div class="user-dropdown-divider"></div>
-                <div class="user-dropdown-item user-dropdown-logout" id="menu-logout">Logout</div>
-            </div>
-        </div>
     </div>`;
 }
 
@@ -221,6 +214,9 @@ function renderNav() {
         <button class="nav-btn ${currentView === 'history' ? 'active' : ''}" data-view="history">
             <span class="nav-btn-icon">&#128200;</span>History
         </button>
+        <button class="nav-btn ${currentView === 'profile' ? 'active' : ''}" data-view="profile">
+            <span class="nav-btn-icon">&#9881;</span>Profile
+        </button>
     </div></nav>`;
 }
 
@@ -230,32 +226,6 @@ function bindNav() {
             currentView = btn.dataset.view;
             render();
         });
-    });
-}
-
-function showLogoutConfirm() {
-    const overlay = document.createElement('div');
-    overlay.className = 'readiness-overlay';
-    overlay.innerHTML = `
-    <div class="readiness-modal" style="text-align:center">
-        <div class="readiness-title">Log Out</div>
-        <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px">Are you sure you want to log out?</p>
-        <button class="btn btn-primary" id="confirm-logout" style="background:var(--red)">Log Out</button>
-        <button class="btn btn-secondary" id="cancel-logout" style="margin-top:8px">Cancel</button>
-    </div>`;
-
-    document.body.appendChild(overlay);
-
-    document.getElementById('confirm-logout').addEventListener('click', () => {
-        overlay.remove();
-        token = null;
-        currentUser = null;
-        localStorage.removeItem('wodgod_token');
-        render();
-    });
-
-    document.getElementById('cancel-logout').addEventListener('click', () => {
-        overlay.remove();
     });
 }
 
@@ -564,6 +534,60 @@ async function loadHistory() {
 }
 
 // ============================================================
+// Profile
+// ============================================================
+function renderProfilePage() {
+    return `
+    <div class="page-title">Profile</div>
+    <div class="profile-menu">
+        <div class="profile-menu-item" id="profile-edit">
+            <span>Edit Profile</span>
+            <span class="profile-menu-arrow">&#8250;</span>
+        </div>
+        <div class="profile-menu-item" id="profile-settings">
+            <span>Settings</span>
+            <span class="profile-menu-arrow">&#8250;</span>
+        </div>
+        <div class="profile-menu-item profile-menu-logout" id="profile-logout">
+            <span>Log Out</span>
+        </div>
+    </div>`;
+}
+
+function bindProfile() {
+    document.getElementById('profile-logout')?.addEventListener('click', () => {
+        showLogoutConfirm();
+    });
+    // Edit Profile and Settings — no-op for now
+}
+
+function showLogoutConfirm() {
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal" style="text-align:center">
+        <div class="readiness-title">Log Out</div>
+        <p style="color:var(--text-dim);font-size:14px;margin-bottom:24px">Are you sure you want to log out?</p>
+        <button class="btn btn-primary" id="confirm-logout" style="background:var(--red)">Log Out</button>
+        <button class="btn btn-secondary" id="cancel-logout" style="margin-top:8px">Cancel</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('confirm-logout').addEventListener('click', () => {
+        overlay.remove();
+        token = null;
+        currentUser = null;
+        localStorage.removeItem('wodgod_token');
+        render();
+    });
+
+    document.getElementById('cancel-logout').addEventListener('click', () => {
+        overlay.remove();
+    });
+}
+
+// ============================================================
 // Helpers
 // ============================================================
 function formatMovement(name) {
@@ -579,35 +603,6 @@ document.addEventListener('DOMContentLoaded', () => {
     todayWod = null;
     calendarData = null;
     historyData = null;
-
-    // Global delegated click handler for user menu
-    document.addEventListener('click', (e) => {
-        const dropdown = document.getElementById('user-dropdown');
-        const menuBtn = document.getElementById('user-menu-btn');
-
-        // Click on the username toggle
-        if (menuBtn && (e.target === menuBtn || menuBtn.contains(e.target))) {
-            if (dropdown) dropdown.classList.toggle('open');
-            return;
-        }
-
-        // Click inside the dropdown
-        if (dropdown && dropdown.contains(e.target)) {
-            const item = e.target.closest('.user-dropdown-item');
-            if (!item) return;
-
-            dropdown.classList.remove('open');
-
-            if (item.id === 'menu-logout') {
-                showLogoutConfirm();
-            }
-            // menu-profile and menu-settings: no-op for now
-            return;
-        }
-
-        // Click anywhere else — close dropdown
-        if (dropdown) dropdown.classList.remove('open');
-    });
 
     render();
 });
