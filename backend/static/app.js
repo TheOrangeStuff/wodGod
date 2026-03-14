@@ -101,6 +101,7 @@ function bindAuth() {
             token = data.token;
             localStorage.setItem('wodgod_token', token);
             currentUser = null;
+            currentView = 'wod';
             render();
         } catch (e) {
             errEl.textContent = e.message;
