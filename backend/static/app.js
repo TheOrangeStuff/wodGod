@@ -280,18 +280,17 @@ function bindNav() {
 // Unified Workouts View
 // ============================================================
 let allWorkouts = null;
-let workoutsFilter = 'today'; // 'all', 'today', 'complete', 'missed', 'upcoming'
+let workoutsFilter = 'today'; // 'today', 'future', 'past', 'all'
 
 function renderWorkoutsPage() {
     let html = '<div class="page-title">Workouts</div>';
 
     // Filter tabs
     html += `<div class="filter-tabs">
-        <button class="filter-tab ${workoutsFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
         <button class="filter-tab ${workoutsFilter === 'today' ? 'active' : ''}" data-filter="today">Today</button>
-        <button class="filter-tab ${workoutsFilter === 'upcoming' ? 'active' : ''}" data-filter="upcoming">Upcoming</button>
-        <button class="filter-tab ${workoutsFilter === 'complete' ? 'active' : ''}" data-filter="complete">Complete</button>
-        <button class="filter-tab ${workoutsFilter === 'missed' ? 'active' : ''}" data-filter="missed">Missed</button>
+        <button class="filter-tab ${workoutsFilter === 'future' ? 'active' : ''}" data-filter="future">Future</button>
+        <button class="filter-tab ${workoutsFilter === 'past' ? 'active' : ''}" data-filter="past">Past</button>
+        <button class="filter-tab ${workoutsFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
     </div>`;
 
     if (!allWorkouts) return html + '<div class="loading" style="min-height:auto;padding:40px 0">Loading workouts...</div>';
@@ -306,7 +305,7 @@ function renderWorkoutsPage() {
 
     const filtered = workoutsFilter === 'all'
         ? allWorkouts
-        : allWorkouts.filter(w => w.status === workoutsFilter.toUpperCase());
+        : allWorkouts.filter(w => w.time_period === workoutsFilter.toUpperCase());
 
     if (filtered.length === 0) {
         html += `<div class="empty">No ${workoutsFilter} workouts.</div>`;
@@ -315,25 +314,30 @@ function renderWorkoutsPage() {
     const today = new Date().toISOString().split('T')[0];
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    // Check if any upcoming workouts exist to decide whether to show generate button
-    const hasUpcoming = allWorkouts.some(w => w.status === 'UPCOMING');
-    const hasToday = allWorkouts.some(w => w.status === 'TODAY');
+    // Check if any future workouts exist to decide whether to show generate button
+    const hasFuture = allWorkouts.some(w => w.time_period === 'FUTURE');
+    const hasToday = allWorkouts.some(w => w.time_period === 'TODAY');
 
     filtered.forEach((w, idx) => {
         const d = new Date(w.scheduled_date + 'T12:00:00');
         const dayName = days[d.getDay()];
         const dayNum = d.getDate();
         const monthStr = d.toLocaleDateString(undefined, { month: 'short' });
-        const isToday = w.scheduled_date === today;
-
-        const statusClass = `status-${w.status.toLowerCase()}`;
-        const statusLabel = w.status;
+        const isToday = w.time_period === 'TODAY';
 
         const detailLine = w.is_custom
             ? `RPE ${w.intensity_target_rpe} | Custom`
             : `RPE ${w.intensity_target_rpe} | CNS ${w.cns_load}`;
 
-        html += `<div class="workout-item ${statusClass}${isToday ? ' is-today' : ''}" data-workout-idx="${idx}" data-workout-id="${w.id}">
+        // Show badge only for COMPLETE and MISSED statuses
+        let badgeHtml = '';
+        if (w.status === 'COMPLETE') {
+            badgeHtml = `<div class="workout-status-badge badge-complete">Complete</div>`;
+        } else if (w.status === 'MISSED') {
+            badgeHtml = `<div class="workout-status-badge badge-missed">Missed</div>`;
+        }
+
+        html += `<div class="workout-item${isToday ? ' is-today' : ''}" data-workout-idx="${idx}" data-workout-id="${w.id}">
             <div class="workout-date">
                 <div class="workout-date-day">${dayNum}</div>
                 <div class="workout-date-label">${dayName}</div>
@@ -343,12 +347,12 @@ function renderWorkoutsPage() {
                 <div class="workout-focus">${w.focus}</div>
                 <div class="workout-detail">${detailLine}</div>
             </div>
-            ${w.status !== 'TODAY' ? `<div class="workout-status-badge badge-${w.status.toLowerCase()}">${statusLabel}</div>` : ''}
+            ${badgeHtml}
         </div>`;
     });
 
-    // Generate week button at the bottom if no upcoming workouts
-    if (!hasUpcoming && !hasToday) {
+    // Generate week button at the bottom if no future workouts
+    if (!hasFuture && !hasToday) {
         html += `<div class="gen-week-prompt">
             <p class="gen-week-hint">All workouts complete. Tap below to generate your next week of programming.</p>
             <button class="btn btn-primary" id="gen-week-btn">Generate This Week</button>
@@ -393,7 +397,7 @@ function bindWorkoutsPage() {
     // Workout item clicks
     const filtered = workoutsFilter === 'all'
         ? allWorkouts
-        : (allWorkouts || []).filter(w => w.status === workoutsFilter.toUpperCase());
+        : (allWorkouts || []).filter(w => w.time_period === workoutsFilter.toUpperCase());
 
     document.querySelectorAll('.workout-item[data-workout-idx]').forEach(el => {
         el.addEventListener('click', () => {
