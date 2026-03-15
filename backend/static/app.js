@@ -47,12 +47,14 @@ function render() {
 
     let content = renderHeader();
     if (currentView === 'workouts') content += renderWorkoutsPage();
+    else if (currentView === 'stats') content += renderStatsPage();
     else if (currentView === 'config') content += renderConfigPage();
     content += renderNav();
 
     app.innerHTML = content;
     bindNav();
     if (currentView === 'workouts') loadWorkouts();
+    else if (currentView === 'stats') loadStats();
     else if (currentView === 'config') bindConfig();
 }
 
@@ -256,6 +258,9 @@ function renderNav() {
         <button class="nav-btn ${currentView === 'workouts' ? 'active' : ''}" data-view="workouts">
             <span class="nav-btn-icon">&#9889;</span>Workouts
         </button>
+        <button class="nav-btn ${currentView === 'stats' ? 'active' : ''}" data-view="stats">
+            <span class="nav-btn-icon">&#9776;</span>Stats
+        </button>
         <button class="nav-btn ${currentView === 'config' ? 'active' : ''}" data-view="config">
             <span class="nav-btn-icon">&#9881;</span>Config
         </button>
@@ -275,7 +280,7 @@ function bindNav() {
 // Unified Workouts View
 // ============================================================
 let allWorkouts = null;
-let workoutsFilter = 'all'; // 'all', 'today', 'complete', 'missed', 'upcoming'
+let workoutsFilter = 'today'; // 'all', 'today', 'complete', 'missed', 'upcoming'
 
 function renderWorkoutsPage() {
     let html = '<div class="page-title">Workouts</div>';
@@ -338,13 +343,16 @@ function renderWorkoutsPage() {
                 <div class="workout-focus">${w.focus}</div>
                 <div class="workout-detail">${detailLine}</div>
             </div>
-            <div class="workout-status-badge badge-${w.status.toLowerCase()}">${statusLabel}</div>
+            ${w.status !== 'TODAY' ? `<div class="workout-status-badge badge-${w.status.toLowerCase()}">${statusLabel}</div>` : ''}
         </div>`;
     });
 
     // Generate week button at the bottom if no upcoming workouts
     if (!hasUpcoming && !hasToday) {
-        html += `<button class="btn btn-primary" id="gen-week-btn" style="margin-top:16px">Generate This Week</button>`;
+        html += `<div class="gen-week-prompt">
+            <p class="gen-week-hint">All workouts complete. Tap below to generate your next week of programming.</p>
+            <button class="btn btn-primary" id="gen-week-btn">Generate This Week</button>
+        </div>`;
     }
 
     return html;
@@ -495,6 +503,172 @@ function showCustomWorkoutDescModal(scheduledDate) {
             btn.textContent = 'Add Workout';
         }
     });
+}
+
+// ============================================================
+// Stats Page
+// ============================================================
+let statsData = null;
+let statsCharts = {};
+
+function renderStatsPage() {
+    let html = '<div class="page-title">Stats</div>';
+
+    if (!statsData) {
+        return html + '<div class="loading" style="min-height:auto;padding:40px 0">Loading stats...</div>';
+    }
+
+    if (!statsData.rpe_trend.length && !statsData.volume_per_week.length && !statsData.movement_balance.length) {
+        return html + '<div class="empty">No workout data yet. Complete some workouts to see your stats.</div>';
+    }
+
+    html += `
+        <div class="stats-chart-card card">
+            <div class="card-title">Movement Balance</div>
+            <canvas id="chart-movement-balance"></canvas>
+        </div>
+        <div class="stats-chart-card card">
+            <div class="card-title">RPE Trend</div>
+            <canvas id="chart-rpe-trend"></canvas>
+        </div>
+        <div class="stats-chart-card card">
+            <div class="card-title">Training Volume / Week</div>
+            <canvas id="chart-volume-week"></canvas>
+        </div>
+    `;
+
+    return html;
+}
+
+async function loadStats() {
+    try {
+        statsData = await api('/stats');
+        const app = document.getElementById('app');
+        let content = renderHeader();
+        content += renderStatsPage();
+        content += renderNav();
+        app.innerHTML = content;
+        bindNav();
+        if (statsData) renderCharts();
+    } catch {
+        statsData = { rpe_trend: [], volume_per_week: [], movement_balance: [] };
+        render();
+    }
+}
+
+function destroyCharts() {
+    Object.values(statsCharts).forEach(c => c.destroy());
+    statsCharts = {};
+}
+
+function renderCharts() {
+    destroyCharts();
+
+    const chartDefaults = {
+        color: '#888',
+        borderColor: '#2a2a2a',
+        font: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif" },
+    };
+    Chart.defaults.color = chartDefaults.color;
+    Chart.defaults.borderColor = chartDefaults.borderColor;
+
+    // Movement Balance Radar
+    const mbEl = document.getElementById('chart-movement-balance');
+    if (mbEl && statsData.movement_balance.length) {
+        const labels = statsData.movement_balance.map(m => m.category.replace(/_/g, ' '));
+        const data = statsData.movement_balance.map(m => m.count);
+        statsCharts.movementBalance = new Chart(mbEl, {
+            type: 'radar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Sessions (21d)',
+                    data,
+                    backgroundColor: 'rgba(255, 77, 0, 0.15)',
+                    borderColor: '#ff4d00',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#ff4d00',
+                    pointRadius: 3,
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#888', backdropColor: 'transparent' },
+                        grid: { color: '#2a2a2a' },
+                        angleLines: { color: '#2a2a2a' },
+                        pointLabels: { color: '#e8e8e8', font: { size: 11 } },
+                    },
+                },
+            },
+        });
+    }
+
+    // RPE Trend Line
+    const rpeEl = document.getElementById('chart-rpe-trend');
+    if (rpeEl && statsData.rpe_trend.length) {
+        const labels = statsData.rpe_trend.map(r => {
+            const d = new Date(r.date + 'T12:00:00');
+            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        });
+        const data = statsData.rpe_trend.map(r => r.rpe);
+        statsCharts.rpeTrend = new Chart(rpeEl, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'RPE',
+                    data,
+                    borderColor: '#ff4d00',
+                    backgroundColor: 'rgba(255, 77, 0, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#ff4d00',
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { min: 1, max: 10, ticks: { stepSize: 1 }, grid: { color: '#2a2a2a' } },
+                    x: { grid: { display: false } },
+                },
+            },
+        });
+    }
+
+    // Volume per Week Bar
+    const volEl = document.getElementById('chart-volume-week');
+    if (volEl && statsData.volume_per_week.length) {
+        const labels = statsData.volume_per_week.map(v => v.week_label);
+        const data = statsData.volume_per_week.map(v => v.sessions);
+        statsCharts.volumeWeek = new Chart(volEl, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Sessions',
+                    data,
+                    backgroundColor: 'rgba(255, 77, 0, 0.6)',
+                    borderColor: '#ff4d00',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#2a2a2a' } },
+                    x: { grid: { display: false } },
+                },
+            },
+        });
+    }
 }
 
 // ============================================================
