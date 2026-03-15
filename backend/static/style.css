@@ -63,7 +63,7 @@ body {
 }
 
 .header h1 span {
-    color: var(--accent);
+    color: #a855f7;
 }
 
 .header-spacer {
@@ -536,7 +536,7 @@ body {
 }
 
 .auth-logo span {
-    color: var(--accent);
+    color: #a855f7;
 }
 
 .auth-subtitle {
