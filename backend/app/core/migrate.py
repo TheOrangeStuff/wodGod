@@ -15,6 +15,7 @@ MIGRATION_FILES = [
     "migrations/002_auth_multiuser.sql",
     "migrations/003_fix_registration_defaults.sql",
     "migrations/004_unit_system.sql",
+    "migrations/005_custom_workouts.sql",
     "functions/001_system_state.sql",
     "functions/002_enhanced_state.sql",
     "seeds/001_seed_data.sql",

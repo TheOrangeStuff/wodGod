@@ -241,9 +241,12 @@ function bindSetup() {
 // Header + Nav
 // ============================================================
 function renderHeader() {
+    const showAdd = currentView === 'workouts';
     return `
     <div class="header">
+        <div class="header-spacer"></div>
         <h1>wod<span>God</span></h1>
+        ${showAdd ? '<button class="header-add-btn" id="add-custom-btn" title="Add Custom Workout">+</button>' : '<div class="header-spacer"></div>'}
     </div>`;
 }
 
@@ -321,6 +324,10 @@ function renderWorkoutsPage() {
         const statusClass = `status-${w.status.toLowerCase()}`;
         const statusLabel = w.status;
 
+        const detailLine = w.is_custom
+            ? `RPE ${w.intensity_target_rpe} | Custom`
+            : `RPE ${w.intensity_target_rpe} | CNS ${w.cns_load}`;
+
         html += `<div class="workout-item ${statusClass}${isToday ? ' is-today' : ''}" data-workout-idx="${idx}" data-workout-id="${w.id}">
             <div class="workout-date">
                 <div class="workout-date-day">${dayNum}</div>
@@ -329,7 +336,7 @@ function renderWorkoutsPage() {
             </div>
             <div class="workout-info">
                 <div class="workout-focus">${w.focus}</div>
-                <div class="workout-detail">RPE ${w.intensity_target_rpe} | CNS ${w.cns_load}</div>
+                <div class="workout-detail">${detailLine}</div>
             </div>
             <div class="workout-status-badge badge-${w.status.toLowerCase()}">${statusLabel}</div>
         </div>`;
@@ -387,6 +394,11 @@ function bindWorkoutsPage() {
         });
     });
 
+    // Add custom workout button
+    document.getElementById('add-custom-btn')?.addEventListener('click', () => {
+        showCustomWorkoutDateModal();
+    });
+
     // Generate week button
     document.getElementById('gen-week-btn')?.addEventListener('click', async () => {
         const btn = document.getElementById('gen-week-btn');
@@ -404,13 +416,96 @@ function bindWorkoutsPage() {
 }
 
 // ============================================================
+// Custom Workout Flow
+// ============================================================
+function showCustomWorkoutDateModal() {
+    const today = new Date().toISOString().split('T')[0];
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">Custom Workout</div>
+        <div class="form-group">
+            <label class="form-label">When did you do this workout?</label>
+            <input class="form-input" id="custom-date" type="date" value="${today}">
+        </div>
+        <button class="btn btn-primary" id="custom-date-next">Next</button>
+        <button class="btn btn-secondary" id="custom-date-cancel" style="margin-top:8px">Cancel</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+    document.getElementById('custom-date-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    document.getElementById('custom-date-next').addEventListener('click', () => {
+        const dateVal = document.getElementById('custom-date').value;
+        if (!dateVal) return;
+        close();
+        setTimeout(() => showCustomWorkoutDescModal(dateVal), 220);
+    });
+}
+
+function showCustomWorkoutDescModal(scheduledDate) {
+    const overlay = document.createElement('div');
+    overlay.className = 'readiness-overlay';
+    overlay.innerHTML = `
+    <div class="readiness-modal">
+        <div class="readiness-title">Describe Your Workout</div>
+        <div id="custom-error" class="error-msg" style="display:none"></div>
+        <div class="form-group">
+            <label class="form-label">What did you do?</label>
+            <textarea class="form-input custom-desc-input" id="custom-desc" rows="4" placeholder="e.g. Ran a 5K in 30 minutes. Best mile pace was 8 minutes."></textarea>
+        </div>
+        <button class="btn btn-primary" id="custom-submit">Add Workout</button>
+        <button class="btn btn-secondary" id="custom-cancel" style="margin-top:8px">Cancel</button>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+    document.getElementById('custom-desc').focus();
+
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 200); };
+    document.getElementById('custom-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    document.getElementById('custom-submit').addEventListener('click', async () => {
+        const desc = document.getElementById('custom-desc').value.trim();
+        const errEl = document.getElementById('custom-error');
+        if (!desc) { errEl.textContent = 'Please describe your workout'; errEl.style.display = ''; return; }
+
+        const btn = document.getElementById('custom-submit');
+        btn.disabled = true;
+        btn.textContent = 'Adding...';
+
+        try {
+            await api('/workouts/custom', {
+                method: 'POST',
+                body: JSON.stringify({ description: desc, scheduled_date: scheduledDate }),
+            });
+            close();
+            allWorkouts = null;
+            render();
+        } catch (e) {
+            errEl.textContent = e.message;
+            errEl.style.display = '';
+            btn.disabled = false;
+            btn.textContent = 'Add Workout';
+        }
+    });
+}
+
+// ============================================================
 // Workout Detail Modal
 // ============================================================
 function showWorkoutDetail(workout) {
     const wj = typeof workout.workout_json === 'string' ? JSON.parse(workout.workout_json) : (workout.workout_json || {});
     const d = new Date(workout.scheduled_date + 'T12:00:00');
     const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const details = renderWorkoutDetails(wj);
+    const isCustom = workout.is_custom || false;
+    const details = isCustom ? '' : renderWorkoutDetails(wj);
 
     const overlay = document.createElement('div');
     overlay.className = 'readiness-overlay';
@@ -468,18 +563,32 @@ function showWorkoutDetail(workout) {
         }
     }
 
+    const metaLine = isCustom
+        ? `<span>${dateStr} — Custom Workout</span>`
+        : `<span>${dateStr} — Week ${workout.program_week}, Day ${workout.day_index}</span>`;
+
+    const customDescHtml = isCustom && (workout.custom_description || wj.custom_description)
+        ? `<div class="card" style="margin:12px 0 0;text-align:left">
+            <div class="wod-section">
+                <div class="wod-section-title">Description</div>
+                <div class="mobility-text">${(workout.custom_description || wj.custom_description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            </div>
+            ${wj.summary && wj.summary !== (workout.custom_description || wj.custom_description) ? `<div class="wod-section" style="margin-top:12px"><div class="wod-section-title">AI Summary</div><div class="mobility-text">${wj.summary.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></div>` : ''}
+           </div>`
+        : '';
+
     overlay.innerHTML = `
     <div class="readiness-modal">
         <div class="readiness-title">${workout.focus}</div>
         <div class="history-detail-meta">
-            <span>${dateStr} — Week ${workout.program_week}, Day ${workout.day_index}</span>
+            ${metaLine}
         </div>
         <div class="history-detail-stats">
             <span class="wod-tag tag-rpe">RPE ${workout.intensity_target_rpe}</span>
             <span class="wod-tag tag-cns-${workout.cns_load}">CNS ${workout.cns_load}</span>
             ${statusBadge}
         </div>
-        ${details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : ''}
+        ${isCustom ? customDescHtml : (details ? `<div class="card" style="margin:12px 0 0;text-align:left">${details}</div>` : '')}
         ${logInfo}
         ${actionsHtml}
     </div>`;

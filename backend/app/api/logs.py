@@ -27,9 +27,10 @@ def log_workout(
             # Verify workout exists and belongs to this user
             cur.execute(
                 """SELECT w.id FROM workouts w
-                   JOIN programs p ON p.id = w.program_id
-                   WHERE w.id = %s AND p.user_id = %s""",
-                (workout_id, user_id),
+                   LEFT JOIN programs p ON p.id = w.program_id
+                   WHERE w.id = %s
+                     AND (p.user_id = %s OR w.user_id = %s)""",
+                (workout_id, user_id, user_id),
             )
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail="Workout not found")

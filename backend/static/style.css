@@ -50,7 +50,7 @@ body {
 .header {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     padding: 16px 0;
     border-bottom: 1px solid var(--border);
     margin-bottom: 20px;
@@ -64,6 +64,32 @@ body {
 
 .header h1 span {
     color: var(--accent);
+}
+
+.header-spacer {
+    width: 36px;
+}
+
+.header-add-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--accent);
+    font-size: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    line-height: 1;
+}
+
+.header-add-btn:hover {
+    border-color: var(--accent);
+    background: rgba(255, 77, 0, 0.1);
 }
 
 /* Navigation */
@@ -706,6 +732,14 @@ body {
     font-size: 13px;
     margin-bottom: 12px;
     text-align: center;
+}
+
+/* Custom workout textarea */
+.custom-desc-input {
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+    line-height: 1.5;
 }
 
 .page-title {
