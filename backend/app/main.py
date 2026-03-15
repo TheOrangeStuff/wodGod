@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api import auth, workouts, logs, programs, settings
+from app.api import auth, workouts, logs, programs, settings, stats
 from app.core.bootstrap import bootstrap_database
 from app.core.migrate import run_migrations
 
@@ -60,6 +60,7 @@ app.include_router(workouts.router)
 app.include_router(logs.router)
 app.include_router(programs.router)
 app.include_router(settings.router)
+app.include_router(stats.router)
 
 
 @app.get("/health")

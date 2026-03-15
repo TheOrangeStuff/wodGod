@@ -747,3 +747,30 @@ body {
     font-weight: 700;
     margin-bottom: 16px;
 }
+
+/* Generate week prompt */
+.gen-week-prompt {
+    text-align: center;
+    margin-top: 24px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.gen-week-hint {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+}
+
+/* Stats page */
+.stats-chart-card {
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.stats-chart-card canvas {
+    max-height: 260px;
+}
