@@ -287,7 +287,7 @@ def get_calendar(user_id: str = Depends(get_current_user_id)):
 
 @router.get("/all")
 def get_all_workouts(user_id: str = Depends(get_current_user_id)):
-    """Get all workouts with status labels: TODAY, COMPLETE, MISSED, UPCOMING."""
+    """Get all workouts with time_period (TODAY/PAST/FUTURE) and status (COMPLETE/MISSED/null)."""
     today = date_type.today()
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -325,11 +325,14 @@ def get_all_workouts(user_id: str = Depends(get_current_user_id)):
                 sd = w["scheduled_date"]
                 has_log = w["id"] in logged_map
                 if sd == today:
-                    w["status"] = "COMPLETE" if has_log else "TODAY"
+                    w["time_period"] = "TODAY"
+                    w["status"] = "COMPLETE" if has_log else None
                 elif sd < today:
+                    w["time_period"] = "PAST"
                     w["status"] = "COMPLETE" if has_log else "MISSED"
                 else:
-                    w["status"] = "UPCOMING"
+                    w["time_period"] = "FUTURE"
+                    w["status"] = None
                 w["log"] = logged_map.get(w["id"])
 
             return workouts
