@@ -450,6 +450,16 @@ body {
     color: var(--red);
 }
 
+.badge-today {
+    background: rgba(255, 77, 0, 0.15);
+    color: var(--accent);
+}
+
+.badge-future, .badge-past {
+    background: rgba(136, 136, 136, 0.15);
+    color: var(--text-dim);
+}
+
 /* Detail log info */
 .detail-log-info {
     display: flex;
