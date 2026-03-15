@@ -67,7 +67,7 @@ def get_current_user(
                        WHERE table_name = 'users' AND column_name = 'unit_system'
                    )"""
             )
-            has_unit_system = cur.fetchone()[0]
+            has_unit_system = cur.fetchone()["exists"]
 
             if has_unit_system:
                 cur.execute(
