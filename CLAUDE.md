@@ -112,7 +112,7 @@ psql $DATABASE_URL -f db/migrations/001_schema.sql
 | Group | Endpoints |
 |-------|-----------|
 | Auth (public) | `POST /auth/register`, `POST /auth/login`, `POST /auth/setup-profile`, `GET /auth/me` |
-| Workouts | `GET /workouts/state`, `GET /workouts/today`, `GET /workouts/calendar`, `POST /workouts/generate`, `POST /workouts/generate-week`, `POST /workouts/custom`, `GET /workouts`, `GET /workouts/{id}`, `GET /workouts/all` |
+| Workouts | `GET /workouts/state`, `GET /workouts/today`, `GET /workouts/calendar`, `POST /workouts/generate`, `POST /workouts/generate-week`, `POST /workouts/custom`, `GET /workouts`, `GET /workouts/{id}`, `GET /workouts/all` (`time_period`: TODAY/PAST/FUTURE, `status`: COMPLETE/MISSED/null) |
 | Logs | `POST /workouts/{id}/log`, `GET /logs`, `POST /readiness`, `GET /readiness` |
 | Programs | `GET /programs/active`, `POST /programs/advance-week`, `POST /programs/set-phase`, `GET /programs/movements`, `GET /programs/strength` |
 | Health | `GET /health` |
@@ -155,7 +155,7 @@ See `.env.example` for all configuration. Key variables:
 ### Frontend
 - [x] Auth flow (login/register)
 - [x] First-time profile setup
-- [x] Workouts view (unified list with filter tabs: All/Today/Upcoming/Complete/Missed)
+- [x] Workouts view (unified list with filter tabs: Today/Future/Past/All)
 - [x] Custom workout entry (+ button in header → date picker → description → submit)
 - [x] Workout detail modal (structured view for generated, description view for custom)
 - [x] Workout logging (RPE, missed reps, notes)
