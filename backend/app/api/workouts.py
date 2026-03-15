@@ -1,13 +1,15 @@
 """Workout generation and management endpoints."""
 
 import json
+from datetime import date as date_type
+
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.core.database import get_db
 from app.core.auth import get_current_user_id
-from app.models.workout import WorkoutPrescription
+from app.models.workout import WorkoutPrescription, CustomWorkoutInput
 from app.services.state_service import get_system_state
-from app.services.llm_service import generate_workout, MAX_RETRIES
+from app.services.llm_service import generate_workout, parse_custom_workout, MAX_RETRIES
 from app.services.validation_service import parse_and_validate
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
@@ -17,6 +19,108 @@ router = APIRouter(prefix="/workouts", tags=["workouts"])
 def get_current_state(user_id: str = Depends(get_current_user_id)):
     """Return the current SYSTEM_STATE JSON for debugging/inspection."""
     return get_system_state(user_id)
+
+
+@router.post("/custom")
+async def create_custom_workout(
+    input: CustomWorkoutInput,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Create a custom workout from a freeform description.
+
+    Attempts LLM parsing to extract structured data (focus, RPE, CNS load).
+    Falls back to sensible defaults if LLM is unavailable.
+    Auto-creates a workout log for past-dated workouts.
+    """
+    try:
+        scheduled_date = date_type.fromisoformat(input.scheduled_date)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    # Try LLM parsing for structured data
+    parsed = await parse_custom_workout(input.description)
+
+    if parsed:
+        focus = parsed["focus"]
+        intensity_rpe = parsed["intensity_target_rpe"]
+        cns_load = parsed["cns_load"]
+        workout_json = {
+            "focus": focus,
+            "intensity_target_rpe": intensity_rpe,
+            "time_domain": parsed["time_domain"],
+            "cns_load": cns_load,
+            "summary": parsed["summary"],
+            "custom_description": input.description,
+        }
+    else:
+        # Fallback: store without structured data
+        focus = "Custom"
+        intensity_rpe = 5.0
+        cns_load = "low"
+        workout_json = {
+            "focus": focus,
+            "intensity_target_rpe": intensity_rpe,
+            "time_domain": "Unknown",
+            "cns_load": cns_load,
+            "summary": input.description[:200],
+            "custom_description": input.description,
+        }
+
+    today = date_type.today()
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO workouts
+                   (user_id, program_id, program_week, day_index, focus,
+                    intensity_target_rpe, cns_load, workout_json,
+                    scheduled_date, custom_description, is_custom)
+                   VALUES (%s, NULL, NULL, NULL, %s, %s, %s, %s, %s, %s, true)
+                   RETURNING id""",
+                (
+                    user_id,
+                    focus,
+                    intensity_rpe,
+                    cns_load,
+                    json.dumps(workout_json),
+                    scheduled_date,
+                    input.description,
+                ),
+            )
+            workout_id = str(cur.fetchone()["id"])
+
+            # Auto-log past and current-day workouts as complete
+            if scheduled_date <= today:
+                cur.execute(
+                    """INSERT INTO workout_logs
+                       (workout_id, user_id, actual_rpe, missed_reps,
+                        performance_json, notes, completed_at)
+                       VALUES (%s, %s, %s, 0, '{}'::jsonb, %s, %s)
+                       RETURNING id, completed_at""",
+                    (
+                        workout_id,
+                        user_id,
+                        intensity_rpe,
+                        f"Custom: {input.description[:500]}",
+                        scheduled_date.isoformat() + "T12:00:00",
+                    ),
+                )
+
+            # Determine status
+            if scheduled_date < today:
+                status = "COMPLETE"
+            elif scheduled_date == today:
+                status = "COMPLETE"
+            else:
+                status = "UPCOMING"
+
+            return {
+                "workout_id": workout_id,
+                "focus": focus,
+                "status": status,
+                "llm_parsed": parsed is not None,
+                "workout_json": workout_json,
+            }
 
 
 @router.post("/generate")
@@ -184,20 +288,22 @@ def get_calendar(user_id: str = Depends(get_current_user_id)):
 @router.get("/all")
 def get_all_workouts(user_id: str = Depends(get_current_user_id)):
     """Get all workouts with status labels: TODAY, COMPLETE, MISSED, UPCOMING."""
-    from datetime import date as date_type
-
     today = date_type.today()
     with get_db() as conn:
         with conn.cursor() as cur:
+            # Get program workouts + custom workouts in one query
             cur.execute(
                 """SELECT w.id, w.program_week, w.day_index, w.focus,
                           w.intensity_target_rpe, w.cns_load, w.workout_json,
-                          w.scheduled_date
+                          w.scheduled_date, w.is_custom, w.custom_description
                    FROM workouts w
-                   JOIN programs p ON p.id = w.program_id
-                   WHERE p.user_id = %s AND p.is_active = true
+                   LEFT JOIN programs p ON p.id = w.program_id
+                   WHERE (
+                       (p.user_id = %s AND p.is_active = true)
+                       OR (w.user_id = %s AND w.is_custom = true)
+                   )
                    ORDER BY w.scheduled_date DESC, w.day_index""",
-                (user_id,),
+                (user_id, user_id),
             )
             workouts = [dict(r) for r in cur.fetchall()]
 
@@ -237,11 +343,13 @@ def get_workout(workout_id: str, user_id: str = Depends(get_current_user_id)):
             cur.execute(
                 """SELECT w.id, w.program_id, w.program_week, w.day_index, w.focus,
                           w.intensity_target_rpe, w.cns_load, w.workout_json,
-                          w.scheduled_date, w.created_at
+                          w.scheduled_date, w.created_at, w.is_custom,
+                          w.custom_description
                    FROM workouts w
-                   JOIN programs p ON p.id = w.program_id
-                   WHERE w.id = %s AND p.user_id = %s""",
-                (workout_id, user_id),
+                   LEFT JOIN programs p ON p.id = w.program_id
+                   WHERE w.id = %s
+                     AND (p.user_id = %s OR w.user_id = %s)""",
+                (workout_id, user_id, user_id),
             )
             row = cur.fetchone()
             if not row:

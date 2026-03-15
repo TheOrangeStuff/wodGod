@@ -52,6 +52,8 @@ RETURNS JSONB AS $$
             'cns_load', w.cns_load,
             'intensity_target_rpe', w.intensity_target_rpe,
             'workout_json', w.workout_json,
+            'is_custom', COALESCE(w.is_custom, false),
+            'custom_description', w.custom_description,
             'actual_rpe', wl.actual_rpe,
             'missed_reps', wl.missed_reps,
             'completed_at', wl.completed_at

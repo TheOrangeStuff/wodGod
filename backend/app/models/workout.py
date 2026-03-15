@@ -56,6 +56,12 @@ class WorkoutPrescription(BaseModel):
     mobility_prompt: str
 
 
+class CustomWorkoutInput(BaseModel):
+    """User-submitted freeform workout description."""
+    description: str = Field(min_length=1, max_length=2000)
+    scheduled_date: str = Field(description="YYYY-MM-DD format")
+
+
 class WorkoutLogInput(BaseModel):
     actual_rpe: float = Field(ge=1.0, le=10.0)
     missed_reps: int = Field(ge=0, default=0)
