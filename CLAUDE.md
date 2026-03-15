@@ -32,6 +32,9 @@ To initialize the database schema on a fresh Postgres instance, run the SQL file
 ```bash
 psql $DATABASE_URL -f db/migrations/001_schema.sql
 psql $DATABASE_URL -f db/migrations/002_auth_multiuser.sql
+psql $DATABASE_URL -f db/migrations/003_fix_registration_defaults.sql
+psql $DATABASE_URL -f db/migrations/004_unit_system.sql
+psql $DATABASE_URL -f db/migrations/005_custom_workouts.sql
 psql $DATABASE_URL -f db/functions/001_system_state.sql
 psql $DATABASE_URL -f db/functions/002_enhanced_state.sql
 psql $DATABASE_URL -f db/seeds/001_seed_data.sql
@@ -45,7 +48,7 @@ backend/
     main.py              # FastAPI entry point + NoCacheStaticMiddleware
     api/
       auth.py            # Auth & profile endpoints
-      workouts.py        # Workout CRUD & generation
+      workouts.py        # Workout CRUD, generation & custom workout entry
       logs.py            # Workout logging & readiness
       programs.py        # Program management
     core/
@@ -56,20 +59,19 @@ backend/
       migrate.py         # Auto-migration runner (schema_migrations table)
     models/
       auth.py            # Pydantic auth models
-      workout.py         # Pydantic workout schemas
+      workout.py         # Pydantic workout schemas (incl. CustomWorkoutInput)
     services/
-      llm_service.py     # LLM integration
+      llm_service.py     # LLM integration (generation + custom workout parsing)
       state_service.py   # System state assembly from DB
       generation_service.py  # Weekly batch generation
       validation_service.py  # Workout validation rules
   static/
-    index.html           # SPA shell
     index.html           # SPA shell (cache-busted v= query params)
-    app.js               # Vanilla JS app (auth, wod, calendar, history, profile)
+    app.js               # Vanilla JS app (auth, workouts, config)
     style.css            # Dark mode, mobile-first CSS
 db/
   init.sh                # DB init orchestrator (runs on container start)
-  migrations/            # Schema DDL (001–003)
+  migrations/            # Schema DDL (001–005)
   functions/             # SQL functions (fn_build_system_state, enhanced context helpers)
   seeds/                 # Demo user & movement taxonomy
 unraid/
@@ -102,7 +104,7 @@ psql $DATABASE_URL -f db/migrations/001_schema.sql
 - **SQL:** Raw parameterized queries via psycopg2 RealDictCursor. No ORM.
 - **Database:** snake_case tables, ENUM types, UUIDs via `gen_random_uuid()`, `created_at`/`updated_at` timestamps (TIMESTAMPTZ).
 - **API:** RESTful paths, Bearer token auth, JSON request/response bodies. Status codes: 200, 201, 401, 404, 409, 422.
-- **Frontend:** Single-page app with view routing via `currentView` (wod, calendar, history, profile). kebab-case CSS classes, camelCase JS functions. Dark mode only, mobile-first (max-width 480px). Static assets served with no-cache headers via `NoCacheStaticMiddleware`; cache-busted `?v=N` query params in `index.html`.
+- **Frontend:** Single-page app with view routing via `currentView` (workouts, config). kebab-case CSS classes, camelCase JS functions. Dark mode only, mobile-first (max-width 480px). Static assets served with no-cache headers via `NoCacheStaticMiddleware`; cache-busted `?v=N` query params in `index.html`.
 - **No formal test suite or linter configured yet.**
 
 ## API Endpoints
@@ -110,7 +112,7 @@ psql $DATABASE_URL -f db/migrations/001_schema.sql
 | Group | Endpoints |
 |-------|-----------|
 | Auth (public) | `POST /auth/register`, `POST /auth/login`, `POST /auth/setup-profile`, `GET /auth/me` |
-| Workouts | `GET /workouts/state`, `GET /workouts/today`, `GET /workouts/calendar`, `POST /workouts/generate`, `POST /workouts/generate-week`, `GET /workouts`, `GET /workouts/{id}` |
+| Workouts | `GET /workouts/state`, `GET /workouts/today`, `GET /workouts/calendar`, `POST /workouts/generate`, `POST /workouts/generate-week`, `POST /workouts/custom`, `GET /workouts`, `GET /workouts/{id}`, `GET /workouts/all` |
 | Logs | `POST /workouts/{id}/log`, `GET /logs`, `POST /readiness`, `GET /readiness` |
 | Programs | `GET /programs/active`, `POST /programs/advance-week`, `POST /programs/set-phase`, `GET /programs/movements`, `GET /programs/strength` |
 | Health | `GET /health` |
@@ -120,7 +122,8 @@ psql $DATABASE_URL -f db/migrations/001_schema.sql
 - Postgres is provided externally by the user — not managed by docker compose
 - Migrations can be run manually via `psql` (see Quick Start) or automatically via `db/init.sh` if using the docker-compose `db` service
 - `fn_build_system_state(user_id)` returns comprehensive JSONB (profile, fatigue, movement balance, aerobic status, progress, rules, recent prescriptions, per-movement load history)
-- Enhanced LLM context (via `002_enhanced_state.sql`): `recent_prescriptions` (14-day workout history), `movement_load_history` (per-movement load/RPE for last 4 sessions), `movement_balance_last_21_days` (mesocycle balance), extended 21-day fatigue metrics
+- Enhanced LLM context (via `002_enhanced_state.sql`): `recent_prescriptions` (14-day workout history incl. custom workouts), `movement_load_history` (per-movement load/RPE for last 4 sessions), `movement_balance_last_21_days` (mesocycle balance), extended 21-day fatigue metrics
+- Custom workouts: `workouts` table supports `is_custom=true` entries with nullable `program_id`/`program_week`/`day_index`, a `custom_description` text field, and a direct `user_id` FK. These are created via `POST /workouts/custom` and appear in `fn_recent_prescriptions` so the LLM factors them into future programming.
 - Max 10 users enforced by database trigger
 - Key tables: `users`, `movements`, `strength_metrics`, `programs`, `workouts`, `workout_logs`, `daily_readiness`
 
@@ -133,7 +136,7 @@ See `.env.example` for all configuration. Key variables:
 - `LLM_MODEL` — Model name (e.g., `llama3`)
 - `DATABASE_URL` — Full connection string pointing to the externally-provided Postgres instance
 
-## Development Status (as of 2026-03-14)
+## Development Status (as of 2026-03-15)
 
 ### Infrastructure Setup
 - [x] `.env` configured with individual Postgres credentials (POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD)
@@ -146,17 +149,19 @@ See `.env.example` for all configuration. Key variables:
 - [x] bcrypt/passlib compatibility fixed (bcrypt pinned to 4.0.1)
 - [x] Static asset caching fixed — no-cache middleware + cache-busted query params in index.html
 - [x] Enhanced LLM context — recent prescriptions, per-movement load history, 21-day fatigue/balance windows fed to LLM for smarter programming
+- [x] Custom workouts — users can add freeform workout descriptions (e.g. "ran a 5K") via + button; LLM parses into structured data when available, falls back to defaults; custom entries feed into LLM context for future programming
 - [ ] LLM provider configured and reachable
 
 ### Frontend
 - [x] Auth flow (login/register)
 - [x] First-time profile setup
-- [x] WOD view (today's workout display + log modal)
-- [x] Calendar view (weekly overview + generate week + tap-to-expand workout details)
-- [x] History view (completed workout logs + tap-to-expand detail modal)
-- [x] Profile page (Edit Profile, Settings — placeholders; Log Out with confirmation modal)
-- [x] Centered header with wodGod branding
-- [x] 4-tab bottom navigation (WOD, Calendar, History, Profile)
+- [x] Workouts view (unified list with filter tabs: All/Today/Upcoming/Complete/Missed)
+- [x] Custom workout entry (+ button in header → date picker → description → submit)
+- [x] Workout detail modal (structured view for generated, description view for custom)
+- [x] Workout logging (RPE, missed reps, notes)
+- [x] Config page (Edit Profile, AI Selection, Log Out)
+- [x] Header with wodGod branding + contextual add button
+- [x] 2-tab bottom navigation (Workouts, Config)
 
 ### User Testing
 - [ ] Login to the app (demo/demo or new account)
