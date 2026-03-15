@@ -25,7 +25,7 @@ def _has_column(cur, column_name: str) -> bool:
            )""",
         (column_name,),
     )
-    return cur.fetchone()[0]
+    return cur.fetchone()["exists"]
 
 
 @router.post("/register")
