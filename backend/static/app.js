@@ -688,23 +688,18 @@ function showWorkoutDetail(workout) {
     const overlay = document.createElement('div');
     overlay.className = 'readiness-overlay';
 
-    let statusBadge = `<span class="wod-tag badge-${workout.status.toLowerCase()}">${workout.status}</span>`;
+    let statusBadge = workout.status
+        ? `<span class="wod-tag badge-${workout.status.toLowerCase()}">${workout.status}</span>`
+        : `<span class="wod-tag badge-${workout.time_period.toLowerCase()}">${workout.time_period}</span>`;
     let actionsHtml = '';
 
-    if (workout.status === 'TODAY') {
-        if (workout.log) {
-            // Already logged today
-            actionsHtml = `
-                <div class="history-detail-actions">
-                    <button class="btn btn-secondary" id="detail-close">Close</button>
-                </div>`;
-        } else {
-            actionsHtml = `
-                <div class="history-detail-actions">
-                    <button class="btn btn-primary" id="detail-log-btn">Log Workout</button>
-                    <button class="btn btn-secondary" id="detail-close">Close</button>
-                </div>`;
-        }
+    if (workout.time_period === 'TODAY' && !workout.status) {
+        // Today, not yet logged
+        actionsHtml = `
+            <div class="history-detail-actions">
+                <button class="btn btn-primary" id="detail-log-btn">Log Workout</button>
+                <button class="btn btn-secondary" id="detail-close">Close</button>
+            </div>`;
     } else if (workout.status === 'COMPLETE') {
         actionsHtml = `
             <div class="history-detail-actions">
@@ -719,7 +714,7 @@ function showWorkoutDetail(workout) {
                 <button class="btn btn-secondary btn-sm" id="detail-close">Close</button>
             </div>`;
     } else {
-        // UPCOMING
+        // FUTURE or TODAY+COMPLETE (already logged today)
         actionsHtml = `
             <div class="history-detail-actions">
                 <button class="btn btn-secondary" id="detail-close">Close</button>
